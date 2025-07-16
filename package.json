@@ -40,6 +40,10 @@
     "pre-commit": "pnpm exec lint-staged --concurrent false"
   },
   "lint-staged": {
+    "*.{ts,tsx}": [
+      "pnpm run build",
+      "git add dist/"
+    ],
     "*": [
       "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true",
       "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
