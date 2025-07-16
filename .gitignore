@@ -3,7 +3,7 @@ node_modules/
 pnpm-lock.yaml
 
 # Build outputs
-dist/
+# dist/ - Required for GitHub Actions, must be committed
 build/
 *.tsbuildinfo
 
