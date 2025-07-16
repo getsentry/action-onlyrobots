@@ -21,6 +21,11 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
 jobs:
   check-robots:
     runs-on: ubuntu-latest
@@ -71,6 +76,11 @@ name: Only Robots Check
 on:
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
 
 jobs:
   check-robots:
