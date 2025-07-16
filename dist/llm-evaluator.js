@@ -114,13 +114,12 @@ Analyze the code looking for these specific signals:
 - Perfect adherence to documentation examples
 - Overly descriptive naming for simple concepts
 
-**HUMAN INDICATORS (look for these to suggest human authorship):**
-- Debug statements, temporary logs, or "here" comments
-- Casual language in TODO/FIXME comments
-- Inconsistent naming conventions or formatting
-- Hardcoded values or quick-fix approaches
-- Mixed old/new syntax patterns
-- Unusual or creative problem-solving approaches
+**FOCUS ON DETECTING OBVIOUS AI PATTERNS:**
+- Look for CRITICAL SIGNALS first - these are definitive
+- Multiple STRUCTURAL FINGERPRINTS together suggest AI generation
+- STYLISTIC PATTERNS may support AI detection but are not decisive alone
+- Absence of human indicators does NOT mean it's AI-generated
+- Professional, clean code is often written by skilled human developers
 
 Respond with your analysis in the exact format specified in the system prompt.`;
     }
@@ -231,12 +230,12 @@ You must respond with a valid JSON object in this exact format:
 }
 
 **IMPORTANT ANALYSIS GUIDELINES:**
-- Be decisive in your analysis - look for clear patterns
-- Weight CRITICAL SIGNALS (99% confidence) most heavily - these override other indicators
-- STRUCTURAL FINGERPRINTS (85-95%) should strongly influence your decision
-- Multiple STYLISTIC PATTERNS (70-85%) together indicate AI generation
-- Only mark as human-written if you find clear HUMAN INDICATORS
-- Default assumption: Clean, well-structured code is likely AI-generated
-- When in doubt between human vs AI, lean toward AI-generated (confidence 60-70%)
-- Only high confidence human indicators should override the AI assumption`;
+- **Default assumption: Code is human-written unless proven otherwise**
+- Only flag as AI-generated when you have STRONG evidence (80%+ confidence)
+- CRITICAL SIGNALS (99%) are definitive - always flag these as AI
+- Multiple STRUCTURAL FINGERPRINTS (85-95%) together may indicate AI
+- STYLISTIC PATTERNS alone are not sufficient - these are common in professional code
+- When uncertain, err on the side of human authorship (confidence 40-60%)
+- Better to miss some AI code than falsely flag human developers
+- Focus on detecting obvious AI patterns, not ruling out human authorship`;
 //# sourceMappingURL=llm-evaluator.js.map
