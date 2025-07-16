@@ -1,0 +1,45 @@
+{
+  "name": "action-onlyrobots",
+  "version": "1.0.0",
+  "description": "GitHub Action to ensure code is written by AI agents, not humans",
+  "main": "dist/index.js",
+  "bin": {
+    "action-onlyrobots": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write",
+    "lint": "pnpm run typecheck && biome lint",
+    "lint:fix": "pnpm run typecheck && biome lint --fix",
+    "prepare": "simple-git-hooks",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "David Cramer <dcramer@gmail.com> (https://github.com/dcramer)",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.1",
+    "@types/node": "^24.0.14",
+    "lint-staged": "^16.1.2",
+    "simple-git-hooks": "^2.13.0",
+    "typescript": "^5.8.3"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged --concurrent false"
+  },
+  "lint-staged": {
+    "*": [
+      "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true",
+      "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "@octokit/rest": "^22.0.0",
+    "commander": "^14.0.0",
+    "openai": "^5.9.2"
+  }
+}

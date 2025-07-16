@@ -1,0 +1,31 @@
+name: 'Only Robots'
+description: 'Ensure code changes are written by AI agents, not humans'
+author: 'Sentry'
+branding:
+  icon: 'robot'
+  color: 'purple'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  openai-api-key:
+    description: 'OpenAI API key for LLM evaluation'
+    required: true
+  pr-number:
+    description: 'Pull request number to evaluate'
+    required: false
+    default: ${{ github.event.pull_request.number }}
+
+outputs:
+  result:
+    description: 'Evaluation result (passed/failed)'
+  confidence:
+    description: 'Confidence score of the evaluation'
+  summary:
+    description: 'Summary of the evaluation'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
