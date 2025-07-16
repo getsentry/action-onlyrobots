@@ -92,8 +92,8 @@ The action automatically creates GitHub check runs with detailed results. No add
 ### Local Development
 
 ```bash
-# Start development server
-pnpm run dev
+# Build the project
+pnpm run build
 
 # Run type checking
 pnpm run typecheck
@@ -101,7 +101,45 @@ pnpm run typecheck
 # Format and lint code
 pnpm run lint
 pnpm run lint:fix
+
+# Run tests (requires .env with OPENAI_API_KEY)
+pnpm run test
+
+# Run tests in watch mode
+pnpm run test:watch
 ```
+
+### Testing
+
+The project includes comprehensive tests that validate the LLM evaluation functionality:
+
+1. **Setup**: Create a `.env` file with your OpenAI API key:
+   ```
+   OPENAI_API_KEY=sk-your-openai-key-here
+   ```
+
+2. **Test Types**:
+   - **Unit Tests**: Test individual functions and components
+   - **Integration Tests**: Test real OpenAI API calls with various code patterns
+   - **End-to-End Tests**: Test complete PR evaluation workflows
+
+3. **Test Coverage**:
+   - AI vs human code detection
+   - AI tool attribution recognition
+   - Multi-file PR evaluation
+   - Error handling and edge cases
+
+4. **Running Tests**:
+   ```bash
+   # Run all tests
+   pnpm run test
+   
+   # Run specific test file
+   pnpm exec vitest run src/test/llm-evaluator.test.ts
+   
+   # Run specific test case
+   pnpm exec vitest run -t "should detect AI tool attribution"
+   ```
 
 ### Git Hooks
 

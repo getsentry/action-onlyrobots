@@ -14,7 +14,8 @@
     "lint": "pnpm run typecheck && biome lint",
     "lint:fix": "pnpm run typecheck && biome lint --fix",
     "prepare": "simple-git-hooks",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "David Cramer <dcramer@gmail.com> (https://github.com/dcramer)",
@@ -22,9 +23,11 @@
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
     "@types/node": "^24.0.14",
+    "dotenv": "^17.2.0",
     "lint-staged": "^16.1.2",
     "simple-git-hooks": "^2.13.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec lint-staged --concurrent false"

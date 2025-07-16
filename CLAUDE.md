@@ -64,7 +64,15 @@ pnpm run lint:fix
 **MANDATORY after ANY code changes:**
 - Run `pnpm run typecheck` to verify TypeScript compilation
 - Run `pnpm run lint` to check code style
+- Run `pnpm run test` to verify LLM integration works
 - Ensure all lint-staged hooks pass on commit
+
+### Testing Setup
+
+**Required for testing:**
+- Create `.env` file with `OPENAI_API_KEY=sk-your-key-here`
+- Tests make real OpenAI API calls to validate functionality
+- Use `pnpm run test` for full test suite or `pnpm run test:watch` for development
 
 ## Configuration
 
