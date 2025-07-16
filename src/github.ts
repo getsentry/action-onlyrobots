@@ -71,14 +71,18 @@ export class GitHubClient {
       throw new Error(`Failed to fetch PR files: ${response.statusText}`);
     }
 
-    const files = await response.json();
+    const files = (await response.json()) as Array<{
+      filename: string;
+      status: string;
+      patch?: string;
+    }>;
     return files
-      .filter((file: any) => file.status !== 'removed' && this.isCodeFile(file.filename))
-      .map((file: any) => ({
+      .filter((file) => file.status !== 'removed' && this.isCodeFile(file.filename))
+      .map((file) => ({
         filename: file.filename,
         patch: file.patch || '',
       }))
-      .filter((file: any) => file.patch.length > 0);
+      .filter((file) => file.patch.length > 0);
   }
 
   private isCodeFile(filename: string): boolean {

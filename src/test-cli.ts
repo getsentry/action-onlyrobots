@@ -124,7 +124,7 @@ function formatResults(
   }
 
   // Summary
-  console.log('\n' + '='.repeat(60));
+  console.log(`\n${'='.repeat(60)}`);
   if (overallResult.isHumanLike) {
     console.log('✅ This PR appears to be human-written');
   } else {
@@ -165,7 +165,7 @@ async function main() {
   try {
     prRef = parsePRReference(prInput);
   } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
+    console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 
@@ -219,8 +219,8 @@ async function main() {
       !!options['show-diffs']
     );
   } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
-    if (options.verbose) {
+    console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+    if (options.verbose && error instanceof Error) {
       console.error(error.stack);
     }
     process.exit(1);

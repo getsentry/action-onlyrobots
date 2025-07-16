@@ -23,5 +23,9 @@
       "semicolons": "always",
       "trailingCommas": "es5"
     }
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": ["src/**/*", "*.json", "*.ts", "*.js"]
   }
 }
