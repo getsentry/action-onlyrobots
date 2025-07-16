@@ -18,11 +18,12 @@ on:
           - v4
           - v5
 
+permissions:
+  contents: write
+
 jobs:
   update-version:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
       
     steps:
       - name: Checkout
