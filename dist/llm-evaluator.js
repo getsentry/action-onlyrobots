@@ -75,9 +75,15 @@ class LLMEvaluator {
         };
     }
     buildEvaluationPrompt(filename, patch) {
+        const isDistFile = filename.startsWith('dist/') || filename.startsWith('lib/') || filename.startsWith('build/');
+        const isDocFile = filename.endsWith('.md') || filename.endsWith('.txt') || filename.includes('README');
+        const isConfigFile = filename.includes('.json') || filename.includes('.yml') || filename.includes('.yaml') || filename.includes('.toml');
         return `Analyze this code change and determine if it appears to be written by a human or an AI agent.
 
 **File:** ${filename}
+${isDistFile ? '**NOTE:** This is a build artifact/compiled file.' : ''}
+${isDocFile ? '**NOTE:** This is a documentation file.' : ''}
+${isConfigFile ? '**NOTE:** This is a configuration file.' : ''}
 
 **Code Changes:**
 \`\`\`diff
@@ -86,11 +92,12 @@ ${patch}
 
 Focus on:
 1. **Obvious AI tool indicators**: Comments or metadata mentioning "Claude Code", "Cursor", "Copilot", "ChatGPT", etc.
-2. **Code style patterns**: Consistent formatting, proper TypeScript usage, good naming
-3. **Comment quality**: Professional JSDoc vs casual comments
-4. **Debugging artifacts**: console.log statements, temporary variables, TODO comments
-5. **Code structure**: Well-organized imports, proper error handling
-6. **Commit metadata**: Any references to AI tools in commit messages
+2. **File context**: Build artifacts, documentation, and config files are often AI-generated when well-structured
+3. **Code style patterns**: Consistent formatting, proper TypeScript usage, good naming
+4. **Comment quality**: Professional JSDoc vs casual comments  
+5. **Debugging artifacts**: console.log statements, temporary variables, TODO comments
+6. **Code structure**: Well-organized imports, proper error handling
+7. **Change patterns**: Systematic, cohesive changes vs ad-hoc fixes
 
 Respond with your analysis in the exact format specified in the system prompt.`;
     }
@@ -159,8 +166,14 @@ const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining w
 
 **CRITICAL INDICATORS:**
 1. **AI Tool Attribution**: Any mention of "Claude Code", "Cursor", "GitHub Copilot", "ChatGPT", "Claude", or similar AI tools is a strong indicator of AI-generated code
-2. **Commit Messages**: References to AI assistance in commit messages
+2. **Commit Messages**: References to AI assistance in commit messages  
 3. **Code Comments**: AI tools often leave specific comment patterns or references
+
+**SPECIAL CASES TO CONSIDER:**
+- **Build artifacts** (files in dist/, lib/, build/ directories): These are compiled outputs and should generally be considered AI-generated if they're well-structured
+- **Large file additions**: Multiple new files added at once often indicates tooling or AI assistance
+- **Documentation updates**: Professional, well-structured documentation often indicates AI assistance
+- **Configuration changes**: Clean, consistent config updates often indicate AI assistance
 
 **ANALYSIS CRITERIA:**
 
@@ -168,11 +181,12 @@ const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining w
 - Debug statements like console.log("test"), console.log("here")
 - TODO/FIXME comments with casual language
 - Inconsistent formatting or spacing
-- Generic variable names (foo, bar, test, temp)
+- Generic variable names (foo, bar, test, temp)  
 - Incomplete implementations or quick fixes
 - Casual or inconsistent commenting style
 - Using older JavaScript patterns (var instead of let/const)
 - Trailing whitespace or formatting inconsistencies
+- Manual, ad-hoc fixes or workarounds
 
 **AI-Generated Code Indicators:**
 - Consistent, professional formatting
@@ -183,6 +197,9 @@ const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining w
 - Descriptive variable and function names
 - Modern JavaScript/TypeScript patterns
 - Clean, production-ready code structure
+- Systematic approach to changes
+- Professional documentation style
+- Multiple related files changed cohesively
 
 **RESPONSE FORMAT:**
 You must respond with a valid JSON object in this exact format:
