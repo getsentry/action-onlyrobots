@@ -3,8 +3,6 @@
  * This file demonstrates clean, well-structured code typical of AI-generated content
  */
 
-import { z } from 'zod';
-
 export interface FeatureConfig {
   enabled: boolean;
   maxRetries: number;
@@ -20,24 +18,50 @@ export interface FeatureResult {
 }
 
 /**
- * Validates feature configuration using Zod schema
+ * Validates feature configuration
  * @param config - The configuration object to validate
  * @returns Validated configuration
  * @throws {Error} If configuration is invalid
  */
 export function validateConfig(config: unknown): FeatureConfig {
-  const configSchema = z.object({
-    enabled: z.boolean(),
-    maxRetries: z.number().min(0).max(10),
-    timeout: z.number().min(1000).max(60000),
-    apiEndpoint: z.string().url(),
-  });
+  if (!config || typeof config !== 'object') {
+    throw new Error('Configuration must be an object');
+  }
+
+  const cfg = config as Record<string, unknown>;
+
+  // Validate enabled field
+  if (typeof cfg.enabled !== 'boolean') {
+    throw new Error('Configuration property "enabled" must be a boolean');
+  }
+
+  // Validate maxRetries field
+  if (typeof cfg.maxRetries !== 'number' || cfg.maxRetries < 0 || cfg.maxRetries > 10) {
+    throw new Error('Configuration property "maxRetries" must be a number between 0 and 10');
+  }
+
+  // Validate timeout field
+  if (typeof cfg.timeout !== 'number' || cfg.timeout < 1000 || cfg.timeout > 60000) {
+    throw new Error('Configuration property "timeout" must be a number between 1000 and 60000');
+  }
+
+  // Validate apiEndpoint field
+  if (typeof cfg.apiEndpoint !== 'string') {
+    throw new Error('Configuration property "apiEndpoint" must be a string');
+  }
 
   try {
-    return configSchema.parse(config);
-  } catch (error) {
-    throw new Error(`Invalid configuration: ${error.message}`);
+    new URL(cfg.apiEndpoint);
+  } catch {
+    throw new Error('Configuration property "apiEndpoint" must be a valid URL');
   }
+
+  return {
+    enabled: cfg.enabled,
+    maxRetries: cfg.maxRetries,
+    timeout: cfg.timeout,
+    apiEndpoint: cfg.apiEndpoint,
+  };
 }
 
 /**
