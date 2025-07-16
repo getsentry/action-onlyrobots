@@ -1,0 +1,231 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const vitest_1 = require("vitest");
+const llm_evaluator_1 = require("../llm-evaluator");
+(0, vitest_1.describe)('Integration Tests', () => {
+    let evaluator;
+    (0, vitest_1.beforeAll)(() => {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            throw new Error('OPENAI_API_KEY must be set in .env file for integration tests');
+        }
+        evaluator = new llm_evaluator_1.LLMEvaluator({ OPENAI_API_KEY: apiKey });
+    });
+    (0, vitest_1.describe)('Real-world code patterns', () => {
+        (0, vitest_1.it)('should correctly identify Claude Code generated code', async () => {
+            const claudeCode = `
+import { Request, Response } from 'express';
+
+/**
+ * Handles user authentication
+ * @param req Express request object
+ * @param res Express response object
+ * @returns Promise resolving to authentication result
+ */
+export async function authenticateUser(req: Request, res: Response): Promise<void> {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
+    }
+    
+    // Validate credentials
+    const user = await validateCredentials(email, password);
+    
+    if (!user) {
+      res.status(401).json({ error: 'Invalid credentials' });
+      return;
+    }
+    
+    res.json({ user, token: generateToken(user.id) });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+`;
+            const result = await evaluator.evaluateFile('auth.ts', claudeCode);
+            (0, vitest_1.expect)(result).toBeDefined();
+            (0, vitest_1.expect)(result.isHumanLike).toBe(false);
+            (0, vitest_1.expect)(result.confidence).toBeGreaterThan(60);
+            (0, vitest_1.expect)(result.reasoning).toBeDefined();
+        });
+        (0, vitest_1.it)('should correctly identify human-written debugging code', async () => {
+            const humanCode = `
+// debugging some weird issue
+var user = null;
+console.log("user data:", user);
+
+function processUser(u) {
+  // TODO: fix this mess
+  console.log("processing user");
+  debugger;
+  
+  if (u == null) {
+    return false;
+  }
+  
+  // another debug line
+  console.log("user is valid");
+  return true;
+}
+
+// temp code
+var results = [];
+for (var i = 0; i < 10; i++) {
+  results.push(processUser(user));
+}
+
+console.log("results:", results);
+`;
+            const result = await evaluator.evaluateFile('debug.js', humanCode);
+            (0, vitest_1.expect)(result).toBeDefined();
+            (0, vitest_1.expect)(result.isHumanLike).toBe(true);
+            (0, vitest_1.expect)(result.confidence).toBeGreaterThan(60);
+            (0, vitest_1.expect)(result.reasoning).toBeDefined();
+        });
+        (0, vitest_1.it)('should detect Cursor AI attribution', async () => {
+            const cursorCode = `
+// Generated with Cursor AI
+export class DataProcessor {
+  private data: any[];
+  
+  constructor(initialData: any[] = []) {
+    this.data = initialData;
+  }
+  
+  process(): ProcessedData[] {
+    return this.data.map(item => ({
+      id: item.id,
+      processed: true,
+      timestamp: new Date().toISOString()
+    }));
+  }
+}
+`;
+            const result = await evaluator.evaluateFile('processor.ts', cursorCode);
+            (0, vitest_1.expect)(result).toBeDefined();
+            (0, vitest_1.expect)(result.isHumanLike).toBe(false);
+            (0, vitest_1.expect)(result.indicators.some((i) => i.toLowerCase().includes('ai') || i.toLowerCase().includes('tool'))).toBe(true);
+            (0, vitest_1.expect)(result.reasoning.toLowerCase()).toContain('cursor');
+        });
+        (0, vitest_1.it)('should handle mixed patterns correctly', async () => {
+            const mixedCode = `
+// This function validates email addresses
+export function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  // TODO: add more validation
+  console.log("validating email:", email);
+  
+  return emailRegex.test(email);
+}
+
+/**
+ * Formats user data for display
+ * @param user User object to format
+ * @returns Formatted user display string
+ */
+export function formatUserDisplay(user: { name: string; email: string }): string {
+  return \`\${user.name} (\${user.email})\`;
+}
+`;
+            const result = await evaluator.evaluateFile('mixed.ts', mixedCode);
+            (0, vitest_1.expect)(result).toBeDefined();
+            (0, vitest_1.expect)(result.confidence).toBeGreaterThan(0);
+            (0, vitest_1.expect)(result.reasoning).toBeDefined();
+            // This should likely be flagged as human due to the debug statements and TODO
+            (0, vitest_1.expect)(result.isHumanLike).toBe(true);
+        });
+    });
+    (0, vitest_1.describe)('End-to-end PR evaluation', () => {
+        (0, vitest_1.it)('should evaluate a complete PR with multiple file types', async () => {
+            const files = [
+                {
+                    filename: 'src/types.ts',
+                    patch: `
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  timestamp: string;
+}
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+`,
+                },
+                {
+                    filename: 'src/api.ts',
+                    patch: `
+/**
+ * Makes an HTTP request to the specified endpoint
+ * @param method HTTP method to use
+ * @param endpoint API endpoint path
+ * @param data Optional request body data
+ * @returns Promise resolving to the API response
+ */
+export async function makeRequest<T>(
+  method: HttpMethod,
+  endpoint: string,
+  data?: any
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(endpoint, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: data ? JSON.stringify(data) : undefined,
+    });
+
+    const result = await response.json();
+    
+    return {
+      success: response.ok,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+`,
+                },
+                {
+                    filename: 'debug.js',
+                    patch: `
+// quick debug script
+var api = require('./api');
+
+console.log("testing api...");
+
+api.makeRequest('GET', '/users').then(function(result) {
+  console.log("got result:", result);
+}).catch(function(err) {
+  console.log("error:", err);
+});
+`,
+                },
+            ];
+            const result = await evaluator.evaluatePullRequest(files);
+            (0, vitest_1.expect)(result).toBeDefined();
+            (0, vitest_1.expect)(result.overallResult).toBeDefined();
+            (0, vitest_1.expect)(result.fileResults).toHaveLength(3);
+            // Should flag as human due to debug.js
+            (0, vitest_1.expect)(result.overallResult.isHumanLike).toBe(true);
+            // Check specific file results
+            const typesFile = result.fileResults.find((f) => f.filename === 'src/types.ts');
+            const apiFile = result.fileResults.find((f) => f.filename === 'src/api.ts');
+            const debugFile = result.fileResults.find((f) => f.filename === 'debug.js');
+            (0, vitest_1.expect)(typesFile?.result.isHumanLike).toBe(false);
+            (0, vitest_1.expect)(apiFile?.result.isHumanLike).toBe(false);
+            (0, vitest_1.expect)(debugFile?.result.isHumanLike).toBe(true);
+        });
+    });
+});
+//# sourceMappingURL=integration.test.js.map

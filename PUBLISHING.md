@@ -91,6 +91,15 @@ Before creating a release:
    git status  # should show no changes in dist/
    ```
 
+## Important: dist/ Directory
+
+**GitHub Actions require the compiled `dist/` directory to be committed to source control.** Unlike typical JavaScript/TypeScript projects where build artifacts are ignored, GitHub Actions run directly from the repository without a build step.
+
+- The `dist/` directory contains compiled JavaScript files that GitHub executes
+- `action.yml` points to `dist/index.js` as the main entry point  
+- Always run `pnpm run build` after code changes to update `dist/`
+- The `check-dist.yml` workflow verifies `dist/` stays in sync with source code
+
 ## Version Strategy
 
 ### Major Versions (v1, v2, v3)
