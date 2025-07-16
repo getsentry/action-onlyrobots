@@ -43,6 +43,10 @@
     "*": [
       "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true",
       "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
+    ],
+    "*.{ts,tsx}": [
+      "pnpm run build",
+      "git add dist/"
     ]
   },
   "dependencies": {

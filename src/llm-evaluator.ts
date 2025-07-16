@@ -104,22 +104,55 @@ export class LLMEvaluator {
   }
 
   private buildEvaluationPrompt(filename: string, patch: string): string {
+    const isDistFile =
+      filename.startsWith('dist/') || filename.startsWith('lib/') || filename.startsWith('build/');
+    const isDocFile =
+      filename.endsWith('.md') || filename.endsWith('.txt') || filename.includes('README');
+    const isConfigFile =
+      filename.includes('.json') ||
+      filename.includes('.yml') ||
+      filename.includes('.yaml') ||
+      filename.includes('.toml');
+
     return `Analyze this code change and determine if it appears to be written by a human or an AI agent.
 
 **File:** ${filename}
+${isDistFile ? '**NOTE:** This is a build artifact/compiled file.' : ''}
+${isDocFile ? '**NOTE:** This is a documentation file.' : ''}
+${isConfigFile ? '**NOTE:** This is a configuration file.' : ''}
 
 **Code Changes:**
 \`\`\`diff
 ${patch}
 \`\`\`
 
-Focus on:
-1. **Obvious AI tool indicators**: Comments or metadata mentioning "Claude Code", "Cursor", "Copilot", "ChatGPT", etc.
-2. **Code style patterns**: Consistent formatting, proper TypeScript usage, good naming
-3. **Comment quality**: Professional JSDoc vs casual comments
-4. **Debugging artifacts**: console.log statements, temporary variables, TODO comments
-5. **Code structure**: Well-organized imports, proper error handling
-6. **Commit metadata**: Any references to AI tools in commit messages
+Analyze the code looking for these specific signals:
+
+**CRITICAL SIGNALS (99% confidence if found):**
+- Direct mentions of AI tools in comments, commit messages, or code
+- Commit messages with perfect conventional commit format adherence  
+- Co-authored-by tags indicating AI pair programming
+
+**STRUCTURAL FINGERPRINTS (85-95% confidence):**
+- Unnaturally perfect formatting consistency across the entire change
+- Overly descriptive, pattern-consistent variable naming throughout
+- Rigid adherence to textbook code organization
+- All comments following identical formatting style
+- Repetitive code structures across different sections
+
+**STYLISTIC PATTERNS (70-85% confidence):**
+- Comments explaining obvious code functionality
+- Comprehensive error handling on every function
+- Consistent use of latest/modern language patterns throughout
+- Perfect adherence to documentation examples
+- Overly descriptive naming for simple concepts
+
+**FOCUS ON DETECTING OBVIOUS AI PATTERNS:**
+- Look for CRITICAL SIGNALS first - these are definitive
+- Multiple STRUCTURAL FINGERPRINTS together suggest AI generation
+- STYLISTIC PATTERNS may support AI detection but are not decisive alone
+- Absence of human indicators does NOT mean it's AI-generated
+- Professional, clean code is often written by skilled human developers
 
 Respond with your analysis in the exact format specified in the system prompt.`;
   }
@@ -198,32 +231,39 @@ Respond with your analysis in the exact format specified in the system prompt.`;
 
 const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining whether code changes appear to be written by a human developer or an AI agent/tool.
 
-**CRITICAL INDICATORS:**
-1. **AI Tool Attribution**: Any mention of "Claude Code", "Cursor", "GitHub Copilot", "ChatGPT", "Claude", or similar AI tools is a strong indicator of AI-generated code
-2. **Commit Messages**: References to AI assistance in commit messages
-3. **Code Comments**: AI tools often leave specific comment patterns or references
+**CRITICAL DETECTION SIGNALS (High Confidence):**
+1. **Direct AI Attribution**: Any mention of "Claude Code", "Cursor", "GitHub Copilot", "ChatGPT", "Claude", "Copilot", or similar AI tools in comments, commit messages, or code
+2. **AI Commit Message Patterns**: Auto-generated commit messages with phrases like "feat:", "fix:", "refactor:" following conventional commit formats too precisely
+3. **Co-authored by AI**: Commit metadata showing AI pair programming or co-authorship
 
-**ANALYSIS CRITERIA:**
+**STRUCTURAL FINGERPRINTS (Medium-High Confidence):**
+1. **Unnaturally Consistent Formatting**: Perfect indentation, spacing, and alignment across entire files
+2. **Predictable Variable Naming**: Overly descriptive, consistent naming patterns (e.g., "userProfileData", "calculateTotalAmount") 
+3. **Rigid Code Structure**: Highly organized imports, perfect separation of concerns, textbook-style organization
+4. **Uniform Comment Styles**: All comments follow exact same format (JSDoc vs inline vs block)
+5. **Pattern Repetition**: Identical code structures repeated across different functions/files
 
-**Human-Written Code Indicators:**
-- Debug statements like console.log("test"), console.log("here")
-- TODO/FIXME comments with casual language
-- Inconsistent formatting or spacing
-- Generic variable names (foo, bar, test, temp)
-- Incomplete implementations or quick fixes
-- Casual or inconsistent commenting style
-- Using older JavaScript patterns (var instead of let/const)
-- Trailing whitespace or formatting inconsistencies
+**STYLISTIC PATTERNS (Medium Confidence):**
+1. **Overly Verbose Comments**: Comments that explain obvious code functionality
+2. **Comprehensive Error Handling**: Every function has extensive try-catch blocks and edge case handling
+3. **Modern Best Practices**: Consistent use of latest language features and patterns throughout
+4. **Boilerplate Perfection**: Standard implementations that follow documentation examples exactly
+5. **Descriptive Everything**: Variable names, function names, and comments are all extremely descriptive
 
-**AI-Generated Code Indicators:**
-- Consistent, professional formatting
-- Proper TypeScript usage with explicit types
-- Well-structured imports and exports
-- Professional JSDoc comments
-- Comprehensive error handling
-- Descriptive variable and function names
-- Modern JavaScript/TypeScript patterns
-- Clean, production-ready code structure
+**HUMAN-WRITTEN INDICATORS (Higher probability of human authorship):**
+1. **Debug Artifacts**: console.log("here"), console.log("debug"), temporary print statements
+2. **Casual Comments**: "// TODO: fix this later", "// hack for now", "// not sure why this works"
+3. **Inconsistent Naming**: Mix of naming conventions (camelCase, snake_case, abbreviations)
+4. **Quick Fixes**: Hardcoded values, magic numbers, copy-pasted code blocks
+5. **Formatting Inconsistencies**: Mixed indentation, irregular spacing, trailing whitespace
+6. **Incomplete Implementations**: Placeholder functions, commented-out code, partial features
+7. **Ad-hoc Solutions**: Unusual or creative approaches to common problems
+8. **Legacy Patterns**: Use of older syntax (var, function declarations) mixed with modern code
+
+**STATISTICAL INDICATORS:**
+- **Low Perplexity**: AI code tends to be more predictable in structure and word choice
+- **Uniform Burstiness**: AI maintains consistent complexity/verbosity levels
+- **Pattern Rigidity**: Exact adherence to style guides without human variation
 
 **RESPONSE FORMAT:**
 You must respond with a valid JSON object in this exact format:
@@ -234,9 +274,12 @@ You must respond with a valid JSON object in this exact format:
   "indicators": ["list", "of", "specific", "indicators", "found"]
 }
 
-**IMPORTANT:**
-- Be decisive but nuanced in your analysis
-- Consider the context of the file type and changes
-- Weight obvious indicators (AI tool mentions) heavily
-- A single strong indicator can override multiple weak ones
-- If unsure, err on the side of human-written (confidence around 50)`;
+**IMPORTANT ANALYSIS GUIDELINES:**
+- **Default assumption: Code is human-written unless proven otherwise**
+- Only flag as AI-generated when you have STRONG evidence (80%+ confidence)
+- CRITICAL SIGNALS (99%) are definitive - always flag these as AI
+- Multiple STRUCTURAL FINGERPRINTS (85-95%) together may indicate AI
+- STYLISTIC PATTERNS alone are not sufficient - these are common in professional code
+- When uncertain, err on the side of human authorship (confidence 40-60%)
+- Better to miss some AI code than falsely flag human developers
+- Focus on detecting obvious AI patterns, not ruling out human authorship`;
