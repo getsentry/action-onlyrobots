@@ -24,6 +24,7 @@
   "keywords": [],
   "author": "David Cramer <dcramer@gmail.com> (https://github.com/dcramer)",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@9.5.0",
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
     "@types/node": "^24.0.14",
