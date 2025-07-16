@@ -15,6 +15,21 @@ The action follows semantic versioning and uses a multi-tag system similar to ot
 
 The automated publishing workflow is triggered when you create a GitHub release:
 
+#### Option A: Using GitHub CLI (Recommended for developers)
+
+```bash
+# Create a new release with auto-generated notes
+gh release create v1.0.0 --title "v1.0.0 - Release Title" --generate-notes
+
+# Or create with custom notes
+gh release create v1.0.0 --title "v1.0.0 - Release Title" --notes "Custom release notes here"
+
+# Or create with notes from a file
+gh release create v1.0.0 --title "v1.0.0 - Release Title" --notes-file CHANGELOG.md
+```
+
+#### Option B: Using GitHub Web Interface
+
 1. **Create a GitHub Release**:
    - Go to the [Releases page](https://github.com/dcramer/action-onlyrobots/releases)
    - Click "Create a new release"
