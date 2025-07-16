@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Build the action
+        run: pnpm run build
+        
+      - name: Run tests
+        run: pnpm run test
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          
+      - name: Run type checking
+        run: pnpm run typecheck
+        
+      - name: Run linting
+        run: pnpm run lint
+        
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          VERSION=${TAG_NAME#v}
+          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "major_version=v$MAJOR_VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+      - name: Update package.json version
+        run: |
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          
+      - name: Rebuild with updated version
+        run: pnpm run build
+        
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+      - name: Commit built files
+        run: |
+          git add dist/ package.json
+          git commit -m "Release ${{ steps.version.outputs.tag_name }}"
+          
+      - name: Create or update major version tag
+        run: |
+          git tag -f ${{ steps.version.outputs.major_version }} ${{ steps.version.outputs.tag_name }}
+          git push origin ${{ steps.version.outputs.major_version }} --force
+          
+      - name: Push changes to release tag
+        run: |
+          git tag -f ${{ steps.version.outputs.tag_name }}
+          git push origin ${{ steps.version.outputs.tag_name }} --force

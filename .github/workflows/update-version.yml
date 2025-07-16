@@ -1,0 +1,52 @@
+name: Update Version Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'The tag or reference to use'
+        required: true
+        type: string
+      major_version:
+        description: 'The major version to update'
+        required: true
+        type: choice
+        options:
+          - v1
+          - v2
+          - v3
+          - v4
+          - v5
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Validate target reference
+        run: |
+          if ! git show-ref --verify --quiet refs/tags/${{ github.event.inputs.target }}; then
+            echo "Error: Tag ${{ github.event.inputs.target }} does not exist"
+            exit 1
+          fi
+          
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+      - name: Update major version tag
+        run: |
+          git tag -f ${{ github.event.inputs.major_version }} ${{ github.event.inputs.target }}
+          git push origin ${{ github.event.inputs.major_version }} --force
+          
+      - name: Summary
+        run: |
+          echo "✅ Successfully updated ${{ github.event.inputs.major_version }} to point to ${{ github.event.inputs.target }}"
