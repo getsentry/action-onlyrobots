@@ -30,6 +30,125 @@ function arrayBufferToHex(buffer: ArrayBuffer): string {
   return hexCodes.join('');
 }
 
+export interface GitHubConfig {
+  GITHUB_TOKEN?: string;
+  GITHUB_WEBHOOK_SECRET: string;
+}
+
+export class GitHubClient {
+  private token?: string;
+  private webhookSecret: string;
+
+  constructor(config: GitHubConfig) {
+    this.token = config.GITHUB_TOKEN;
+    this.webhookSecret = config.GITHUB_WEBHOOK_SECRET;
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'action-onlyrobots/1.0',
+    };
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    return headers;
+  }
+
+  async fetchPullRequestFiles(
+    owner: string,
+    repo: string,
+    pullNumber: number
+  ): Promise<Array<{ filename: string; patch: string }>> {
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/files`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PR files: ${response.statusText}`);
+    }
+
+    const files = await response.json();
+    return files
+      .filter((file: any) => file.status !== 'removed' && this.isCodeFile(file.filename))
+      .map((file: any) => ({
+        filename: file.filename,
+        patch: file.patch || '',
+      }))
+      .filter((file: any) => file.patch.length > 0);
+  }
+
+  private isCodeFile(filename: string): boolean {
+    const codeExtensions = [
+      '.js',
+      '.jsx',
+      '.ts',
+      '.tsx',
+      '.py',
+      '.java',
+      '.cpp',
+      '.c',
+      '.h',
+      '.cs',
+      '.rb',
+      '.go',
+      '.rs',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.php',
+      '.vue',
+      '.svelte',
+      '.astro',
+      '.mjs',
+      '.cjs',
+      '.json',
+      '.yaml',
+      '.yml',
+    ];
+
+    return codeExtensions.some((ext) => filename.endsWith(ext));
+  }
+
+  async verifyWebhookSignature(body: string, signature: string | null): Promise<boolean> {
+    return verifyWebhookSignature(body, signature, this.webhookSecret);
+  }
+
+  async createCheckRun(
+    owner: string,
+    repo: string,
+    data: {
+      name: string;
+      head_sha: string;
+      status: 'queued' | 'in_progress' | 'completed';
+      conclusion?: 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out';
+      output?: {
+        title: string;
+        summary: string;
+        text?: string;
+      };
+    }
+  ): Promise<void> {
+    if (!this.token) {
+      throw new Error('GitHub token is required to create check runs');
+    }
+
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/check-runs`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create check run: ${error}`);
+    }
+  }
+}
+
 export async function fetchPullRequestFiles(
   owner: string,
   repo: string,
