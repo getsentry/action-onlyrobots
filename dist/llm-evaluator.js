@@ -77,7 +77,10 @@ class LLMEvaluator {
     buildEvaluationPrompt(filename, patch) {
         const isDistFile = filename.startsWith('dist/') || filename.startsWith('lib/') || filename.startsWith('build/');
         const isDocFile = filename.endsWith('.md') || filename.endsWith('.txt') || filename.includes('README');
-        const isConfigFile = filename.includes('.json') || filename.includes('.yml') || filename.includes('.yaml') || filename.includes('.toml');
+        const isConfigFile = filename.includes('.json') ||
+            filename.includes('.yml') ||
+            filename.includes('.yaml') ||
+            filename.includes('.toml');
         return `Analyze this code change and determine if it appears to be written by a human or an AI agent.
 
 **File:** ${filename}
@@ -90,14 +93,34 @@ ${isConfigFile ? '**NOTE:** This is a configuration file.' : ''}
 ${patch}
 \`\`\`
 
-Focus on:
-1. **Obvious AI tool indicators**: Comments or metadata mentioning "Claude Code", "Cursor", "Copilot", "ChatGPT", etc.
-2. **File context**: Build artifacts, documentation, and config files are often AI-generated when well-structured
-3. **Code style patterns**: Consistent formatting, proper TypeScript usage, good naming
-4. **Comment quality**: Professional JSDoc vs casual comments  
-5. **Debugging artifacts**: console.log statements, temporary variables, TODO comments
-6. **Code structure**: Well-organized imports, proper error handling
-7. **Change patterns**: Systematic, cohesive changes vs ad-hoc fixes
+Analyze the code looking for these specific signals:
+
+**CRITICAL SIGNALS (99% confidence if found):**
+- Direct mentions of AI tools in comments, commit messages, or code
+- Commit messages with perfect conventional commit format adherence  
+- Co-authored-by tags indicating AI pair programming
+
+**STRUCTURAL FINGERPRINTS (85-95% confidence):**
+- Unnaturally perfect formatting consistency across the entire change
+- Overly descriptive, pattern-consistent variable naming throughout
+- Rigid adherence to textbook code organization
+- All comments following identical formatting style
+- Repetitive code structures across different sections
+
+**STYLISTIC PATTERNS (70-85% confidence):**
+- Comments explaining obvious code functionality
+- Comprehensive error handling on every function
+- Consistent use of latest/modern language patterns throughout
+- Perfect adherence to documentation examples
+- Overly descriptive naming for simple concepts
+
+**HUMAN INDICATORS (look for these to suggest human authorship):**
+- Debug statements, temporary logs, or "here" comments
+- Casual language in TODO/FIXME comments
+- Inconsistent naming conventions or formatting
+- Hardcoded values or quick-fix approaches
+- Mixed old/new syntax patterns
+- Unusual or creative problem-solving approaches
 
 Respond with your analysis in the exact format specified in the system prompt.`;
     }
@@ -164,42 +187,39 @@ Respond with your analysis in the exact format specified in the system prompt.`;
 exports.LLMEvaluator = LLMEvaluator;
 const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining whether code changes appear to be written by a human developer or an AI agent/tool.
 
-**CRITICAL INDICATORS:**
-1. **AI Tool Attribution**: Any mention of "Claude Code", "Cursor", "GitHub Copilot", "ChatGPT", "Claude", or similar AI tools is a strong indicator of AI-generated code
-2. **Commit Messages**: References to AI assistance in commit messages  
-3. **Code Comments**: AI tools often leave specific comment patterns or references
+**CRITICAL DETECTION SIGNALS (High Confidence):**
+1. **Direct AI Attribution**: Any mention of "Claude Code", "Cursor", "GitHub Copilot", "ChatGPT", "Claude", "Copilot", or similar AI tools in comments, commit messages, or code
+2. **AI Commit Message Patterns**: Auto-generated commit messages with phrases like "feat:", "fix:", "refactor:" following conventional commit formats too precisely
+3. **Co-authored by AI**: Commit metadata showing AI pair programming or co-authorship
 
-**SPECIAL CASES TO CONSIDER:**
-- **Build artifacts** (files in dist/, lib/, build/ directories): These are compiled outputs and should generally be considered AI-generated if they're well-structured
-- **Large file additions**: Multiple new files added at once often indicates tooling or AI assistance
-- **Documentation updates**: Professional, well-structured documentation often indicates AI assistance
-- **Configuration changes**: Clean, consistent config updates often indicate AI assistance
+**STRUCTURAL FINGERPRINTS (Medium-High Confidence):**
+1. **Unnaturally Consistent Formatting**: Perfect indentation, spacing, and alignment across entire files
+2. **Predictable Variable Naming**: Overly descriptive, consistent naming patterns (e.g., "userProfileData", "calculateTotalAmount") 
+3. **Rigid Code Structure**: Highly organized imports, perfect separation of concerns, textbook-style organization
+4. **Uniform Comment Styles**: All comments follow exact same format (JSDoc vs inline vs block)
+5. **Pattern Repetition**: Identical code structures repeated across different functions/files
 
-**ANALYSIS CRITERIA:**
+**STYLISTIC PATTERNS (Medium Confidence):**
+1. **Overly Verbose Comments**: Comments that explain obvious code functionality
+2. **Comprehensive Error Handling**: Every function has extensive try-catch blocks and edge case handling
+3. **Modern Best Practices**: Consistent use of latest language features and patterns throughout
+4. **Boilerplate Perfection**: Standard implementations that follow documentation examples exactly
+5. **Descriptive Everything**: Variable names, function names, and comments are all extremely descriptive
 
-**Human-Written Code Indicators:**
-- Debug statements like console.log("test"), console.log("here")
-- TODO/FIXME comments with casual language
-- Inconsistent formatting or spacing
-- Generic variable names (foo, bar, test, temp)  
-- Incomplete implementations or quick fixes
-- Casual or inconsistent commenting style
-- Using older JavaScript patterns (var instead of let/const)
-- Trailing whitespace or formatting inconsistencies
-- Manual, ad-hoc fixes or workarounds
+**HUMAN-WRITTEN INDICATORS (Higher probability of human authorship):**
+1. **Debug Artifacts**: console.log("here"), console.log("debug"), temporary print statements
+2. **Casual Comments**: "// TODO: fix this later", "// hack for now", "// not sure why this works"
+3. **Inconsistent Naming**: Mix of naming conventions (camelCase, snake_case, abbreviations)
+4. **Quick Fixes**: Hardcoded values, magic numbers, copy-pasted code blocks
+5. **Formatting Inconsistencies**: Mixed indentation, irregular spacing, trailing whitespace
+6. **Incomplete Implementations**: Placeholder functions, commented-out code, partial features
+7. **Ad-hoc Solutions**: Unusual or creative approaches to common problems
+8. **Legacy Patterns**: Use of older syntax (var, function declarations) mixed with modern code
 
-**AI-Generated Code Indicators:**
-- Consistent, professional formatting
-- Proper TypeScript usage with explicit types
-- Well-structured imports and exports
-- Professional JSDoc comments
-- Comprehensive error handling
-- Descriptive variable and function names
-- Modern JavaScript/TypeScript patterns
-- Clean, production-ready code structure
-- Systematic approach to changes
-- Professional documentation style
-- Multiple related files changed cohesively
+**STATISTICAL INDICATORS:**
+- **Low Perplexity**: AI code tends to be more predictable in structure and word choice
+- **Uniform Burstiness**: AI maintains consistent complexity/verbosity levels
+- **Pattern Rigidity**: Exact adherence to style guides without human variation
 
 **RESPONSE FORMAT:**
 You must respond with a valid JSON object in this exact format:
@@ -210,10 +230,13 @@ You must respond with a valid JSON object in this exact format:
   "indicators": ["list", "of", "specific", "indicators", "found"]
 }
 
-**IMPORTANT:**
-- Be decisive but nuanced in your analysis
-- Consider the context of the file type and changes
-- Weight obvious indicators (AI tool mentions) heavily
-- A single strong indicator can override multiple weak ones
-- If unsure, err on the side of human-written (confidence around 50)`;
+**IMPORTANT ANALYSIS GUIDELINES:**
+- Be decisive in your analysis - look for clear patterns
+- Weight CRITICAL SIGNALS (99% confidence) most heavily - these override other indicators
+- STRUCTURAL FINGERPRINTS (85-95%) should strongly influence your decision
+- Multiple STYLISTIC PATTERNS (70-85%) together indicate AI generation
+- Only mark as human-written if you find clear HUMAN INDICATORS
+- Default assumption: Clean, well-structured code is likely AI-generated
+- When in doubt between human vs AI, lean toward AI-generated (confidence 60-70%)
+- Only high confidence human indicators should override the AI assumption`;
 //# sourceMappingURL=llm-evaluator.js.map
