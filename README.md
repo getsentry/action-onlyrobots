@@ -107,7 +107,40 @@ pnpm run test
 
 # Run tests in watch mode
 pnpm run test:watch
+
+# Test a specific PR
+pnpm run test-pr https://github.com/owner/repo/pull/123
+pnpm run test-pr owner/repo#123 --verbose --show-diffs
 ```
+
+### CLI Tool for Testing PRs
+
+The project includes a CLI tool for testing PR evaluation locally:
+
+```bash
+# Basic usage
+pnpm run test-pr https://github.com/getsentry/sentry-mcp/pull/394
+
+# Using shorthand format
+pnpm run test-pr getsentry/sentry-mcp#394
+
+# Show detailed analysis for each file
+pnpm run test-pr owner/repo#123 --verbose
+
+# Show the actual code diffs being analyzed
+pnpm run test-pr owner/repo#123 --verbose --show-diffs
+
+# Output as JSON for automation
+pnpm run test-pr owner/repo#123 --format json
+```
+
+**CLI Options:**
+- `--help` - Show help message
+- `--format <format>` - Output format: text (default) or json
+- `--github-token` - GitHub token for API access (or set GITHUB_TOKEN env var)
+- `--openai-key` - OpenAI API key (or set OPENAI_API_KEY env var)
+- `--verbose` - Show detailed analysis for each file
+- `--show-diffs` - Show the actual code diffs being analyzed
 
 ### Testing
 
@@ -158,7 +191,7 @@ pnpm run prepare
 2. **File Analysis**: Fetches changed files from the PR
 3. **LLM Evaluation**: Sends each file to OpenAI GPT-4o-mini for analysis
 4. **Result Aggregation**: Combines individual file results into overall assessment
-5. **Reporting**: Logs detailed results (GitHub Check Runs in future versions)
+5. **Reporting**: Creates GitHub Check Runs with detailed results
 
 ### Detection Criteria
 
@@ -207,41 +240,49 @@ const response = await this.openai.chat.completions.create({
 ### Supported File Types
 
 The system analyzes these file extensions:
-- JavaScript/TypeScript: `.js`, `.jsx`, `.ts`, `.tsx`
+- JavaScript/TypeScript: `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`
 - Python: `.py`
 - Other languages: `.java`, `.cpp`, `.c`, `.h`, `.cs`, `.rb`, `.go`, `.rs`, `.swift`, `.kt`, `.scala`, `.php`
 - Frontend: `.vue`, `.svelte`, `.astro`
+- Configuration: `.json`, `.yaml`, `.yml`
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"OPENAI_API_KEY is required" error**
-   - Ensure you've set the OpenAI API key in Cloudflare Workers environment
+   - Ensure you've set the OpenAI API key as a GitHub secret or in your `.env` file
 
-2. **Webhook signature verification fails**
-   - Check that `GITHUB_WEBHOOK_SECRET` matches between GitHub and Cloudflare
-   - Ensure webhook payload URL is correct
+2. **Rate limiting errors**
+   - The action may hit OpenAI rate limits for very large PRs
+   - Consider using the CLI tool to test specific PRs during development
 
-3. **Worker timeout errors**
-   - Large PRs may hit Cloudflare's timeout limits
-   - Consider implementing file batching or async processing
+3. **GitHub API errors**
+   - Ensure the GitHub token has appropriate permissions
+   - For private repositories, you may need to provide a personal access token
 
 ### Debugging
 
-Check worker logs in Cloudflare Dashboard:
-1. Go to Workers & Pages → no-humans-agent
-2. Click "View" → "Logs"
-3. Monitor real-time logs during webhook events
+Use the CLI tool to test and debug PR evaluation:
+```bash
+# Test with verbose output
+pnpm run test-pr owner/repo#123 --verbose
+
+# Show actual diffs being analyzed
+pnpm run test-pr owner/repo#123 --show-diffs
+
+# Get JSON output for detailed analysis
+pnpm run test-pr owner/repo#123 --format json
+```
 
 ## Future Enhancements
 
-- GitHub App integration for proper Check Runs
 - Configurable evaluation rules and scoring
 - Support for more file types and languages
 - Batch processing for large PRs
 - Caching for improved performance
-- Integration with GitHub Actions
+- Webhook support for real-time evaluation
+- Custom AI model selection via configuration
 
 ## Contributing
 
