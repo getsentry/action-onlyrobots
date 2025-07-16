@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:clean": "rm -rf dist && pnpm run build",
     "start": "node dist/cli.js",
     "test-pr": "tsx src/test-cli.ts",
     "typecheck": "tsc --noEmit",
@@ -16,11 +17,14 @@
     "lint:fix": "pnpm run typecheck && biome lint --fix",
     "prepare": "simple-git-hooks",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "validate": "pnpm run typecheck && pnpm run lint && pnpm run test",
+    "package": "pnpm run build:clean && pnpm run validate"
   },
   "keywords": [],
   "author": "David Cramer <dcramer@gmail.com> (https://github.com/dcramer)",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@9.5.0",
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
     "@types/node": "^24.0.14",
