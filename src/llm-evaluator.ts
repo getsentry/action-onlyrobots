@@ -140,6 +140,13 @@ Analyze the code looking for these specific signals:
 - All comments following identical formatting style
 - Repetitive code structures across different sections
 
+**PRECISION INDICATORS (75-90% confidence):**
+- Single-character formatting fixes (adding newlines, spaces, commas)
+- Surgical precision changes with no side effects or additional modifications
+- Minimal, targeted fixes to specific formatting or syntax issues
+- Changes that follow exact patterns (e.g., consistently adding newlines to list items)
+- Simple string literal modifications for formatting consistency
+
 **STYLISTIC PATTERNS (70-85% confidence):**
 - Comments explaining obvious code functionality
 - Comprehensive error handling on every function
@@ -150,7 +157,9 @@ Analyze the code looking for these specific signals:
 **FOCUS ON DETECTING OBVIOUS AI PATTERNS:**
 - Look for CRITICAL SIGNALS first - these are definitive
 - Multiple STRUCTURAL FINGERPRINTS together suggest AI generation
+- PRECISION INDICATORS are strong signals for AI-generated formatting fixes
 - STYLISTIC PATTERNS may support AI detection but are not decisive alone
+- Small, surgical changes with perfect precision are typical of AI assistants
 - Absence of human indicators does NOT mean it's AI-generated
 - Professional, clean code is often written by skilled human developers
 
@@ -201,6 +210,16 @@ Respond with your analysis in the exact format specified in the system prompt.`;
     if (lowerContent.includes('consistent') || lowerContent.includes('formatted')) {
       indicators.push('consistent-formatting');
     }
+    if (
+      lowerContent.includes('surgical') ||
+      lowerContent.includes('precision') ||
+      lowerContent.includes('targeted')
+    ) {
+      indicators.push('precision-changes');
+    }
+    if (lowerContent.includes('newline') || lowerContent.includes('formatting fix')) {
+      indicators.push('formatting-fix');
+    }
 
     return indicators;
   }
@@ -242,6 +261,13 @@ const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining w
 3. **Rigid Code Structure**: Highly organized imports, perfect separation of concerns, textbook-style organization
 4. **Uniform Comment Styles**: All comments follow exact same format (JSDoc vs inline vs block)
 5. **Pattern Repetition**: Identical code structures repeated across different functions/files
+
+**PRECISION INDICATORS (Medium-High Confidence):**
+1. **Surgical Formatting Changes**: Single-character fixes like adding newlines, spaces, or punctuation
+2. **Targeted Corrections**: Minimal changes that fix specific issues without touching surrounding code
+3. **Pattern-Based Fixes**: Consistent application of the same small change across multiple locations
+4. **Zero Side Effects**: Changes that only address the stated problem with no extra modifications
+5. **Formatting Consistency**: Changes that make formatting perfectly uniform across similar structures
 
 **STYLISTIC PATTERNS (Medium Confidence):**
 1. **Overly Verbose Comments**: Comments that explain obvious code functionality
