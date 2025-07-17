@@ -2,7 +2,7 @@ name: 'Only Robots'
 description: 'Ensure code changes are written by AI agents, not humans'
 author: 'Sentry'
 branding:
-  icon: 'robot'
+  icon: 'battery-charging'
   color: 'purple'
 
 inputs:
