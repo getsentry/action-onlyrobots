@@ -146,7 +146,7 @@ function buildHumanDetectionComment(overallResult: any): string {
   if (overallResult.indicators && overallResult.indicators.length > 0) {
     messages.push(`### 🔍 Human fingerprints detected:\n`);
     for (const indicator of overallResult.indicators) {
-      messages.push(`- ${indicator}`);
+      messages.push(`- ${indicator}\n`);
     }
     messages.push(`\n`);
   }
