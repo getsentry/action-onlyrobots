@@ -15,6 +15,8 @@ The action follows semantic versioning and uses a multi-tag system similar to ot
 
 The automated publishing workflow is triggered when you create a GitHub release:
 
+> **Note:** Creating a release via CLI or API does NOT automatically publish to GitHub Marketplace. You must manually enable marketplace publishing through the web UI after creating the release.
+
 #### Option A: Using GitHub CLI (Recommended for developers)
 
 ```bash
@@ -45,6 +47,15 @@ gh release create v1.0.0 --title "v1.0.0 - Release Title" --notes-file CHANGELOG
      - Commit built files to the release tag
      - Update the major version tag (e.g., `v1` → `v1.0.0`)
 
+3. **Publishing to GitHub Marketplace** (Manual Step):
+   - Navigate to the [Releases page](https://github.com/getsentry/action-onlyrobots/releases)
+   - Find your newly created release
+   - Click "Edit" on the release
+   - Check the box "Publish this Action to the GitHub Marketplace"
+   - If first time: Accept the GitHub Marketplace Developer Agreement
+   - Click "Update release"
+   - Your action will now appear in the GitHub Marketplace!
+
 ### 2. Manual Version Tag Updates
 
 If you need to manually update a major version tag to point to a different release:
@@ -71,6 +82,29 @@ If you need to manually update a major version tag to point to a different relea
 ### `.github/workflows/update-version.yml`
 - Manual workflow for updating major version tags
 - Useful for hotfixes or corrections
+
+## GitHub Marketplace Requirements
+
+For your action to be eligible for the GitHub Marketplace:
+
+1. **Repository Requirements**:
+   - Must be a public repository ✅
+   - Must contain a single `action.yml` or `action.yaml` at the root ✅
+   - Must NOT contain any workflow files in `.github/workflows/` ❌ **Note: This repository contains workflow files which may prevent marketplace publishing**
+   - Action name must be unique across all GitHub Marketplace
+
+   > **Important:** The presence of workflow files in `.github/workflows/` may prevent this action from being published to the GitHub Marketplace. Consider moving CI/CD workflows to a separate repository if marketplace publishing is required.
+
+2. **Metadata Requirements** (`action.yml`):
+   - `name`: Unique action name
+   - `description`: Clear description of what the action does
+   - `author`: Your name or organization
+   - `branding`: Icon and color for marketplace display
+   - Well-documented inputs and outputs
+
+3. **Account Requirements**:
+   - Two-factor authentication (2FA) must be enabled
+   - Must accept the GitHub Marketplace Developer Agreement
 
 ## Pre-Release Checklist
 
@@ -158,6 +192,16 @@ If a major version tag points to the wrong release:
    git tag -f v1 v1.0.1
    git push origin v1 --force
    ```
+
+## Why Marketplace Publishing Requires Manual Action
+
+GitHub requires manual intervention for marketplace publishing for security reasons:
+
+1. **2FA Verification**: Publishing to the marketplace requires two-factor authentication verification that can only be done through the web browser
+2. **Developer Agreement**: The first marketplace publication requires accepting the GitHub Marketplace Developer Agreement
+3. **Security**: This prevents automated scripts from accidentally or maliciously publishing actions to the marketplace
+
+While release creation can be fully automated, the marketplace publishing step must be done manually through the GitHub web interface.
 
 ## Security Notes
 
