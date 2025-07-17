@@ -1,6 +1,6 @@
 {
   "name": "action-onlyrobots",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "GitHub Action to ensure code is written by AI agents, not humans",
   "main": "dist/index.js",
   "bin": {
