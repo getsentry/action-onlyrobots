@@ -7,7 +7,7 @@
     "action-onlyrobots": "dist/cli.js"
   },
   "scripts": {
-    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "build": "ncc build src/index.ts -o dist --license licenses.txt --no-source-map-register",
     "build:clean": "rm -rf dist && pnpm run build",
     "start": "node dist/cli.js",
     "test-pr": "tsx src/test-cli.ts",
