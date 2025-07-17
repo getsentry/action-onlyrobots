@@ -7,7 +7,7 @@
     "action-onlyrobots": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsdown src/index.ts --out-dir dist --format cjs --platform node --minify --treeshake --clean",
     "build:clean": "rm -rf dist && pnpm run build",
     "start": "node dist/cli.js",
     "test-pr": "tsx src/test-cli.ts",
@@ -32,6 +32,7 @@
     "lint-staged": "^16.1.2",
     "simple-git-hooks": "^2.13.0",
     "ts-node": "^10.9.2",
+    "tsdown": "^0.12.9",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
