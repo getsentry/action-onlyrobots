@@ -30,6 +30,9 @@ importers:
       '@types/node':
         specifier: ^24.0.14
         version: 24.0.14
+      '@vercel/ncc':
+        specifier: ^0.38.3
+        version: 0.38.3
       dotenv:
         specifier: ^17.2.0
         version: 17.2.0
@@ -648,6 +651,10 @@ packages:
 
   '@types/node@24.0.14':
     resolution: {integrity: sha512-4zXMWD91vBLGRtHK3YbIoFMia+1nqEz72coM42C5ETjnNCa/heoj7NT1G67iAfOqMmcfhuCZ4uNpyz8EjlAejw==}
+
+  '@vercel/ncc@0.38.3':
+    resolution: {integrity: sha512-rnK6hJBS6mwc+Bkab+PGPs9OiS0i/3kdTO+CkI8V0/VrW3vmz7O2Pxjw/owOlmo6PKEIxRSeZKv/kuL9itnpYA==}
+    hasBin: true
 
   '@vitest/expect@3.2.4':
     resolution: {integrity: sha512-Io0yyORnB6sikFlt8QW5K7slY4OjqNX9jmJQ02QDda8lyM6B5oNgVWoSoKPac8/kgnCUzuHQKrSLtu/uOqqrig==}
@@ -1746,6 +1753,8 @@ snapshots:
   '@types/node@24.0.14':
     dependencies:
       undici-types: 7.8.0
+
+  '@vercel/ncc@0.38.3': {}
 
   '@vitest/expect@3.2.4':
     dependencies:

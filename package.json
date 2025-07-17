@@ -7,7 +7,7 @@
     "action-onlyrobots": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --out-dir dist --format cjs --platform node --minify --treeshake --clean",
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "build:clean": "rm -rf dist && pnpm run build",
     "start": "node dist/cli.js",
     "test-pr": "tsx src/test-cli.ts",
@@ -28,6 +28,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
     "@types/node": "^24.0.14",
+    "@vercel/ncc": "^0.38.3",
     "dotenv": "^17.2.0",
     "lint-staged": "^16.1.2",
     "simple-git-hooks": "^2.13.0",
@@ -45,8 +46,8 @@
       "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true",
       "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
     ],
-    "*.{ts,tsx}": [
-      "pnpm run build",
+    "src/**/*.{ts,tsx}": [
+      "sh -c 'pnpm run build'",
       "git add dist/"
     ]
   },
