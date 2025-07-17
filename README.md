@@ -35,6 +35,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          post-comment: true  # Optional: post a fun comment when humans are detected
 ```
 
 ## Configuration
@@ -46,6 +47,7 @@ jobs:
 | `github-token` | GitHub token for API access | Yes | `${{ github.token }}` |
 | `openai-api-key` | OpenAI API key for LLM evaluation | Yes | - |
 | `pr-number` | Pull request number to evaluate | No | Auto-detected |
+| `post-comment` | Post a comment on PR when human code is detected | No | `false` |
 
 ### Outputs
 
@@ -91,11 +93,22 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          post-comment: true  # Optional: post a fun comment when humans are detected
 ```
 
-### 3. Enable Check Runs
+### 3. Required Permissions
 
-The action automatically creates GitHub check runs with detailed results. No additional configuration needed!
+The action requires the following permissions:
+
+- **`contents: read`** - To read repository contents
+- **`pull-requests: write`** - To post comments on PRs (when `post-comment: true`)
+- **`checks: write`** - To create check runs with detailed results
+
+> **Note**: The `checks: write` permission is only available for workflows triggered by repository events, not from forks. For pull requests from forks, the action will gracefully degrade and skip creating check runs.
+
+### 4. Enable PR Comments (Optional)
+
+To enable fun, helpful comments when human code is detected, set `post-comment: true` in your workflow. The action will post a humorous but informative comment explaining why the code was flagged and how to fix it.
 
 ## Development
 

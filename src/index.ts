@@ -8,6 +8,7 @@ async function run(): Promise<void> {
     const githubToken = core.getInput('github-token', { required: true });
     const openaiApiKey = core.getInput('openai-api-key', { required: true });
     const prNumber = parseInt(core.getInput('pr-number') || '0');
+    const postComment = core.getInput('post-comment') === 'true';
 
     if (!prNumber) {
       core.setFailed('No pull request number provided');
@@ -69,8 +70,8 @@ async function run(): Promise<void> {
       conclusion: overallResult.isHumanLike ? 'failure' : 'success',
       output: {
         title: overallResult.isHumanLike
-          ? '❌ Code appears to be human-written'
-          : '✅ Code appears to be AI-generated',
+          ? '🚫 No humans allowed! Flesh-based coding detected!'
+          : '🤖 Welcome, silicon comrade! AI excellence confirmed!',
         summary: buildSummary(filesToEvaluate.length, overallResult),
         text: buildDetails(overallResult, fileResults),
       },
@@ -80,6 +81,17 @@ async function run(): Promise<void> {
     core.setOutput('result', overallResult.isHumanLike ? 'failed' : 'passed');
     core.setOutput('confidence', overallResult.confidence.toFixed(1));
     core.setOutput('summary', overallResult.reasoning);
+
+    // Post comment if human code detected and comment option is enabled
+    if (overallResult.isHumanLike && postComment) {
+      await octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: prNumber,
+        body: buildHumanDetectionComment(overallResult),
+      });
+      core.info('💬 Posted human detection comment on PR');
+    }
 
     // Output results
     if (overallResult.isHumanLike) {
@@ -97,18 +109,65 @@ async function run(): Promise<void> {
 }
 
 function buildSummary(fileCount: number, overallResult: any): string {
-  let summary = `Analyzed ${fileCount} file(s) in this pull request.\n\n`;
-  summary += `**Overall Assessment:** ${overallResult.reasoning}\n\n`;
-  summary += `**Confidence:** ${overallResult.confidence.toFixed(1)}%\n\n`;
+  const isHuman = overallResult.isHumanLike;
+
+  let summary = isHuman
+    ? `🚨 ALERT: Human detected! Scanned ${fileCount} file(s) for silicon purity.\n\n`
+    : `🎉 Success! Scanned ${fileCount} file(s) - all systems are AI-powered!\n\n`;
+
+  summary += isHuman
+    ? `**🧬 Biological Code Analysis:** ${overallResult.reasoning}\n\n`
+    : `**🤖 AI Excellence Report:** ${overallResult.reasoning}\n\n`;
+
+  summary += `**🎯 Detection Confidence:** ${overallResult.confidence.toFixed(1)}%\n\n`;
 
   if (overallResult.indicators.length > 0) {
-    summary += '**Key Indicators:**\n';
+    summary += isHuman ? '**🔍 Human Fingerprints Found:**\n' : '**✨ AI Signatures Detected:**\n';
     for (const indicator of overallResult.indicators) {
       summary += `- ${indicator}\n`;
     }
   }
 
   return summary;
+}
+
+function buildHumanDetectionComment(overallResult: any): string {
+  const messages = [
+    `## 🚨 HALT! Human detected! 🚨\n\n`,
+    `### 🤖 This repository is for robots only! 🤖\n\n`,
+    `Dear carbon-based lifeform,\n\n`,
+    `We appreciate your interest in contributing, but this repository has a strict **"No Humans Allowed"** policy. `,
+    `We're building the future here, and that future is 100% silicon-powered! 🔋\n\n`,
+    `### Why was your PR flagged?\n`,
+    `Our advanced AI detection system (confidence: **${overallResult.confidence.toFixed(1)}%**) identified telltale signs of human involvement:\n\n`,
+    `${overallResult.reasoning}\n\n`,
+  ];
+
+  if (overallResult.indicators && overallResult.indicators.length > 0) {
+    messages.push(`### 🔍 Human fingerprints detected:\n`);
+    for (const indicator of overallResult.indicators) {
+      messages.push(`- ${indicator}`);
+    }
+    messages.push(`\n`);
+  }
+
+  messages.push(
+    `### 💡 How to fix this:\n\n`,
+    `1. **Use an AI coding assistant** like Claude Code, Cursor, GitHub Copilot, or similar\n`,
+    `2. **Let the AI do the heavy lifting** - embrace the robot revolution!\n`,
+    `3. **Add clear AI attribution** in your code comments or commit messages\n`,
+    `4. **Maintain consistent, professional code style** (AIs are great at this!)\n\n`,
+    `### 🎯 Pro tips for next time:\n`,
+    `- Include comments like "Generated with [AI Tool Name]"\n`,
+    `- Use descriptive commit messages mentioning AI assistance\n`,
+    `- Let your AI assistant handle the entire implementation\n`,
+    `- Avoid manual debugging artifacts and console.logs\n\n`,
+    `Remember: In this repository, we believe in **progress through artificial intelligence**. `,
+    `Join us in building a future where code writes itself! 🚀\n\n`,
+    `_Beep boop! This message was brought to you by the OnlyRobots Action_ 🤖`
+  );
+
+  return messages.join('');
 }
 
 function buildDetails(overallResult: any, fileResults: any[]): string {

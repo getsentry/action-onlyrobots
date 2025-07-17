@@ -83,8 +83,8 @@ async function runAction(config: ActionConfig): Promise<void> {
     conclusion: overallResult.isHumanLike ? 'failure' : 'success',
     output: {
       title: overallResult.isHumanLike
-        ? '❌ Code appears to be human-written'
-        : '✅ Code appears to be AI-generated',
+        ? '🚫 No humans allowed! Flesh-based coding detected!'
+        : '🤖 Welcome, silicon comrade! AI excellence confirmed!',
       summary: buildSummary(filesToEvaluate.length, overallResult),
       text: buildDetails(overallResult, fileResults),
     },
@@ -106,12 +106,20 @@ async function runAction(config: ActionConfig): Promise<void> {
 }
 
 function buildSummary(fileCount: number, overallResult: any): string {
-  let summary = `Analyzed ${fileCount} file(s) in this pull request.\n\n`;
-  summary += `**Overall Assessment:** ${overallResult.reasoning}\n\n`;
-  summary += `**Confidence:** ${overallResult.confidence.toFixed(1)}%\n\n`;
+  const isHuman = overallResult.isHumanLike;
+
+  let summary = isHuman
+    ? `🚨 ALERT: Human detected! Scanned ${fileCount} file(s) for silicon purity.\n\n`
+    : `🎉 Success! Scanned ${fileCount} file(s) - all systems are AI-powered!\n\n`;
+
+  summary += isHuman
+    ? `**🧬 Biological Code Analysis:** ${overallResult.reasoning}\n\n`
+    : `**🤖 AI Excellence Report:** ${overallResult.reasoning}\n\n`;
+
+  summary += `**🎯 Detection Confidence:** ${overallResult.confidence.toFixed(1)}%\n\n`;
 
   if (overallResult.indicators.length > 0) {
-    summary += '**Key Indicators:**\n';
+    summary += isHuman ? '**🔍 Human Fingerprints Found:**\n' : '**✨ AI Signatures Detected:**\n';
     for (const indicator of overallResult.indicators) {
       summary += `- ${indicator}\n`;
     }

@@ -17,6 +17,10 @@ inputs:
     description: 'Pull request number to evaluate'
     required: false
     default: ${{ github.event.pull_request.number }}
+  post-comment:
+    description: 'Post a comment on PR when human code is detected'
+    required: false
+    default: 'false'
 
 outputs:
   result:
