@@ -35,7 +35,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          post-comment: true  # Optional: post a fun comment when humans are detected
+          post-comment: true  # Optional: post a fun comment when humans are detected (default: true)
+          fail-on-human: false  # Optional: fail the build when humans are detected (default: false)
 ```
 
 ## Configuration
@@ -47,7 +48,8 @@ jobs:
 | `github-token` | GitHub token for API access | Yes | `${{ github.token }}` |
 | `openai-api-key` | OpenAI API key for LLM evaluation | Yes | - |
 | `pr-number` | Pull request number to evaluate | No | Auto-detected |
-| `post-comment` | Post a comment on PR when human code is detected | No | `false` |
+| `post-comment` | Post a comment on PR when human code is detected | No | `true` |
+| `fail-on-human` | Fail the build when human code is detected | No | `false` |
 
 ### Outputs
 
@@ -93,7 +95,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          post-comment: true  # Optional: post a fun comment when humans are detected
+          post-comment: true  # Optional: post a fun comment when humans are detected (default: true)
+          fail-on-human: false  # Optional: fail the build when humans are detected (default: false)
 ```
 
 ### 3. Required Permissions

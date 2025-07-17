@@ -20,6 +20,10 @@ inputs:
   post-comment:
     description: 'Post a comment on PR when human code is detected'
     required: false
+    default: 'true'
+  fail-on-human:
+    description: 'Fail the build when human code is detected'
+    required: false
     default: 'false'
 
 outputs:

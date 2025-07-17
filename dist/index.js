@@ -29971,6 +29971,7 @@ async function run() {
         const openaiApiKey = core.getInput('openai-api-key', { required: true });
         const prNumber = parseInt(core.getInput('pr-number') || '0');
         const postComment = core.getInput('post-comment') === 'true';
+        const failOnHuman = core.getInput('fail-on-human') === 'true';
         if (!prNumber) {
             core.setFailed('No pull request number provided');
             return;
@@ -30043,7 +30044,13 @@ async function run() {
         }
         // Output results
         if (overallResult.isHumanLike) {
-            core.setFailed(`Code appears to be human-written (${overallResult.confidence.toFixed(1)}% confidence)`);
+            const message = `Code appears to be human-written (${overallResult.confidence.toFixed(1)}% confidence)`;
+            if (failOnHuman) {
+                core.setFailed(message);
+            }
+            else {
+                core.warning(message);
+            }
         }
         else {
             core.info(`✅ Code appears to be AI-generated (${overallResult.confidence.toFixed(1)}% confidence)`);
