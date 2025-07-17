@@ -30275,11 +30275,12 @@ Analyze the code looking for these specific signals:
 - Simple string literal modifications for formatting consistency
 
 **STYLISTIC PATTERNS (70-85% confidence):**
-- Comments explaining obvious code functionality
+- Comments explaining obvious code functionality  
 - Comprehensive error handling on every function
 - Consistent use of latest/modern language patterns throughout
 - Perfect adherence to documentation examples
-- Overly descriptive naming for simple concepts
+- Overly descriptive naming for simple concepts (e.g., "userDisplayNameString", "formatUserDisplayNameWithEmailAddress")
+- Verbose parameter names with unnecessary detail (e.g., "userAccountInformation" instead of "user")
 
 **FOCUS ON DETECTING OBVIOUS AI PATTERNS:**
 - Look for CRITICAL SIGNALS first - these are definitive
@@ -30342,6 +30343,11 @@ Respond with your analysis in the exact format specified in the system prompt.`;
         if (lowerContent.includes('newline') || lowerContent.includes('formatting fix')) {
             indicators.push('formatting-fix');
         }
+        if (lowerContent.includes('verbose') ||
+            lowerContent.includes('descriptive naming') ||
+            lowerContent.includes('overly descriptive')) {
+            indicators.push('verbose-naming');
+        }
         return indicators;
     }
     buildOverallReasoning(fileResults, humanLikeFiles) {
@@ -30384,10 +30390,11 @@ const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining w
 
 **STYLISTIC PATTERNS (Medium Confidence):**
 1. **Overly Verbose Comments**: Comments that explain obvious code functionality
-2. **Comprehensive Error Handling**: Every function has extensive try-catch blocks and edge case handling
+2. **Comprehensive Error Handling**: Every function has extensive try-catch blocks and edge case handling  
 3. **Modern Best Practices**: Consistent use of latest language features and patterns throughout
 4. **Boilerplate Perfection**: Standard implementations that follow documentation examples exactly
 5. **Descriptive Everything**: Variable names, function names, and comments are all extremely descriptive
+6. **Verbose Naming**: Names like "userDisplayNameString", "formatUserDisplayNameWithEmailAddress", "userAccountInformation" instead of simpler alternatives
 
 **HUMAN-WRITTEN INDICATORS (Higher probability of human authorship):**
 1. **Debug Artifacts**: console.log("here"), console.log("debug"), temporary print statements
