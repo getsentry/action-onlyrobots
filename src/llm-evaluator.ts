@@ -1,5 +1,18 @@
 import OpenAI from 'openai';
 
+// Constants for evaluation
+const AI_INDICATORS = {
+  STRONG_SIGNALS: ['ai attribution', 'ai tool', 'claude', 'cursor', 'copilot'],
+  FORMATTING: ['formatting-fix', 'precision-changes', 'consistent-formatting'],
+} as const;
+
+const CONFIDENCE_ADJUSTMENTS = {
+  NO_DESCRIPTION: -20,
+  TERSE_TITLE: -15,
+  CI_FILES_ONLY: -25,
+  FORMATTING_WITH_CONTEXT: -10,
+} as const;
+
 export interface LLMEvaluationResult {
   isHumanLike: boolean;
   confidence: number;
@@ -16,6 +29,12 @@ export interface FileAnalysis {
   filename: string;
   patch: string;
   result: LLMEvaluationResult;
+}
+
+export interface PRContext {
+  title?: string;
+  description?: string;
+  commitMessages?: string[];
 }
 
 export class LLMEvaluator {
@@ -69,13 +88,28 @@ export class LLMEvaluator {
     }
   }
 
-  async evaluatePullRequest(files: FileToEvaluate[]): Promise<{
+  async evaluatePullRequest(
+    files: FileToEvaluate[],
+    prContext?: PRContext
+  ): Promise<{
     overallResult: LLMEvaluationResult;
     fileResults: FileAnalysis[];
   }> {
+    // Evaluate each file individually
+    const fileResults = await this.evaluateFiles(files);
+
+    // Check for strong AI signals that should never be overridden
+    if (this.hasStrongAISignals(fileResults)) {
+      return this.buildAIDetectedResult(fileResults);
+    }
+
+    // Apply PR context adjustments for ambiguous cases
+    return this.applyPRContextAdjustments(fileResults, prContext);
+  }
+
+  private async evaluateFiles(files: FileToEvaluate[]): Promise<FileAnalysis[]> {
     const fileResults: FileAnalysis[] = [];
 
-    // Evaluate each file
     for (const file of files) {
       const result = await this.evaluateFile(file.filename, file.patch);
       fileResults.push({
@@ -85,41 +119,265 @@ export class LLMEvaluator {
       });
     }
 
-    // Aggregate results
+    return fileResults;
+  }
+
+  private hasStrongAISignals(fileResults: FileAnalysis[]): boolean {
+    return fileResults.some((f) =>
+      f.result.indicators.some((indicator) => {
+        const indLower = indicator.toLowerCase();
+        return AI_INDICATORS.STRONG_SIGNALS.some((signal) => indLower.includes(signal));
+      })
+    );
+  }
+
+  private buildAIDetectedResult(fileResults: FileAnalysis[]): {
+    overallResult: LLMEvaluationResult;
+    fileResults: FileAnalysis[];
+  } {
     const humanLikeFiles = fileResults.filter((f) => f.result.isHumanLike);
     const avgConfidence =
       fileResults.reduce((sum, f) => sum + f.result.confidence, 0) / fileResults.length;
 
-    const overallResult: LLMEvaluationResult = {
-      isHumanLike: humanLikeFiles.length > 0,
-      confidence: avgConfidence,
-      reasoning: this.buildOverallReasoning(fileResults, humanLikeFiles),
-      indicators: this.aggregateIndicators(fileResults),
-    };
+    const aiTools = this.extractAITools(fileResults);
+    const reasoning = `Strong AI attribution detected in ${
+      fileResults.length - humanLikeFiles.length
+    } file(s). Code explicitly mentions AI tool usage${
+      aiTools.length > 0 ? ` (${aiTools.join(', ')})` : ''
+    }.`;
 
     return {
-      overallResult,
+      overallResult: {
+        isHumanLike: false,
+        confidence: avgConfidence,
+        reasoning,
+        indicators: this.aggregateIndicators(fileResults),
+      },
       fileResults,
     };
   }
 
+  private applyPRContextAdjustments(
+    fileResults: FileAnalysis[],
+    prContext?: PRContext
+  ): {
+    overallResult: LLMEvaluationResult;
+    fileResults: FileAnalysis[];
+  } {
+    const humanLikeFiles = fileResults.filter((f) => f.result.isHumanLike);
+    const aiFiles = fileResults.filter((f) => !f.result.isHumanLike);
+
+    // Calculate weighted confidence based on file results
+    let avgConfidence =
+      fileResults.reduce((sum, f) => sum + f.result.confidence, 0) / fileResults.length;
+
+    // More sophisticated decision logic:
+    // - Majority of files must be AI-generated to flag as AI
+    // - Consider confidence levels
+    let isHumanLike = true; // Default to human
+
+    if (aiFiles.length > humanLikeFiles.length) {
+      // Majority are AI files
+      const aiConfidenceAvg =
+        aiFiles.reduce((sum, f) => sum + f.result.confidence, 0) / aiFiles.length;
+
+      // Only flag as AI if AI files have high confidence
+      if (aiConfidenceAvg > 75) {
+        isHumanLike = false;
+      }
+    }
+
+    // Apply PR context adjustments
+    if (prContext) {
+      const prIndicators = this.analyzePRContext(fileResults, prContext);
+
+      // PR context can push borderline cases toward human
+      if (!isHumanLike && prIndicators.indicators.length >= 3) {
+        // Strong PR signals for human authorship
+        if (avgConfidence < 80) {
+          // Only override if not super confident about AI
+          isHumanLike = true;
+          avgConfidence = Math.max(
+            0,
+            Math.min(100, avgConfidence + prIndicators.confidenceAdjustment)
+          );
+        }
+      }
+
+      const reasoning = this.buildContextAwareReasoning(
+        fileResults,
+        humanLikeFiles,
+        prIndicators,
+        prContext
+      );
+
+      return {
+        overallResult: {
+          isHumanLike,
+          confidence: isHumanLike ? 100 - avgConfidence : avgConfidence,
+          reasoning,
+          indicators: [...this.aggregateIndicators(fileResults), ...prIndicators.indicators],
+        },
+        fileResults,
+      };
+    }
+
+    // Default case - no PR context
+    const reasoning = this.buildOverallReasoning(fileResults, humanLikeFiles);
+
+    return {
+      overallResult: {
+        isHumanLike,
+        confidence: isHumanLike ? 100 - avgConfidence : avgConfidence,
+        reasoning,
+        indicators: this.aggregateIndicators(fileResults),
+      },
+      fileResults,
+    };
+  }
+
+  private analyzePRContext(
+    fileResults: FileAnalysis[],
+    prContext?: PRContext
+  ): { indicators: string[]; confidenceAdjustment: number } {
+    const indicators: string[] = [];
+    let confidenceAdjustment = 0;
+
+    if (!prContext) {
+      return { indicators, confidenceAdjustment };
+    }
+
+    // Check for minimal/no description
+    if (!prContext.description || prContext.description.trim() === '') {
+      indicators.push('no-pr-description');
+      confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.NO_DESCRIPTION;
+    }
+
+    // Check for terse fix/correct titles
+    if (prContext.title) {
+      const titleLower = prContext.title.toLowerCase();
+      if (this.isTerseFixTitle(titleLower)) {
+        indicators.push('terse-fix-title');
+        confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.TERSE_TITLE;
+      }
+    }
+
+    // Check if all changes are in CI/CD files
+    if (this.areAllCIFiles(fileResults)) {
+      indicators.push('ci-workflow-changes-only');
+      confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.CI_FILES_ONLY;
+    }
+
+    // Check for formatting-only changes with human context
+    if (this.areFormattingOnlyChanges(fileResults) && indicators.length > 0) {
+      indicators.push('formatting-fixes-with-human-context');
+      confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.FORMATTING_WITH_CONTEXT;
+    }
+
+    return { indicators, confidenceAdjustment };
+  }
+
+  private isTerseFixTitle(title: string): boolean {
+    return (
+      title.startsWith('fix') ||
+      title.startsWith('correct') ||
+      title.startsWith('update') ||
+      !!title.match(/^(fix|correct|update)\s+\w+/)
+    );
+  }
+
+  private areAllCIFiles(fileResults: FileAnalysis[]): boolean {
+    return fileResults.every(
+      (f) => f.filename.includes('.github/workflows') || f.filename.includes('ci/')
+    );
+  }
+
+  private areFormattingOnlyChanges(fileResults: FileAnalysis[]): boolean {
+    return fileResults.every((f) =>
+      f.result.indicators.some((ind) =>
+        AI_INDICATORS.FORMATTING.some((format) => ind.toLowerCase().includes(format))
+      )
+    );
+  }
+
+  private extractAITools(fileResults: FileAnalysis[]): string[] {
+    const aiTools = new Set<string>();
+
+    for (const file of fileResults) {
+      const reasoning = file.result.reasoning.toLowerCase();
+      if (reasoning.includes('claude')) aiTools.add('Claude Code');
+      if (reasoning.includes('cursor')) aiTools.add('Cursor');
+      if (reasoning.includes('copilot')) aiTools.add('GitHub Copilot');
+    }
+
+    return Array.from(aiTools);
+  }
+
+  private buildOverallReasoning(
+    fileResults: FileAnalysis[],
+    humanLikeFiles: FileAnalysis[]
+  ): string {
+    const totalFiles = fileResults.length;
+    const humanFiles = humanLikeFiles.length;
+
+    if (humanFiles === 0) {
+      return `All ${totalFiles} file(s) appear to be AI-generated. Code shows consistent patterns typical of AI-assisted development.`;
+    }
+
+    if (humanFiles === totalFiles) {
+      return `All ${totalFiles} file(s) appear to be human-written. Code shows characteristics typical of human development patterns.`;
+    }
+
+    return `Mixed results: ${humanFiles} of ${totalFiles} file(s) appear human-written. This suggests a combination of human and AI contribution.`;
+  }
+
+  private buildContextAwareReasoning(
+    fileResults: FileAnalysis[],
+    humanLikeFiles: FileAnalysis[],
+    prIndicators: { indicators: string[]; confidenceAdjustment: number },
+    prContext?: PRContext
+  ): string {
+    const totalFiles = fileResults.length;
+    const humanFiles = humanLikeFiles.length;
+
+    let reasoning = '';
+
+    // Add PR context analysis if applicable
+    if (prIndicators.indicators.length > 0) {
+      reasoning += 'PR-level analysis suggests human authorship: ';
+
+      if (prIndicators.indicators.includes('no-pr-description')) {
+        reasoning += 'No PR description provided (typical of quick human fixes). ';
+      }
+      if (prIndicators.indicators.includes('terse-fix-title')) {
+        reasoning += `Terse PR title "${prContext?.title}" indicates human intervention. `;
+      }
+      if (prIndicators.indicators.includes('ci-workflow-changes-only')) {
+        reasoning += 'Changes only affect CI/CD workflows (commonly human debugging). ';
+      }
+      reasoning += '\n\n';
+    }
+
+    // Add file-level analysis
+    if (humanFiles === 0 && prIndicators.indicators.length === 0) {
+      reasoning += `All ${totalFiles} file(s) show consistent AI-generation patterns.`;
+    } else if (humanFiles === totalFiles) {
+      reasoning += `All ${totalFiles} file(s) appear to be human-written based on code analysis.`;
+    } else {
+      reasoning += `File analysis: ${humanFiles} of ${totalFiles} file(s) appear human-written. `;
+      reasoning += 'Combined with PR context, this suggests human authorship.';
+    }
+
+    return reasoning;
+  }
+
   private buildEvaluationPrompt(filename: string, patch: string): string {
-    const isDistFile =
-      filename.startsWith('dist/') || filename.startsWith('lib/') || filename.startsWith('build/');
-    const isDocFile =
-      filename.endsWith('.md') || filename.endsWith('.txt') || filename.includes('README');
-    const isConfigFile =
-      filename.includes('.json') ||
-      filename.includes('.yml') ||
-      filename.includes('.yaml') ||
-      filename.includes('.toml');
+    const fileType = this.getFileType(filename);
 
     return `Analyze this code change and determine if it appears to be written by a human or an AI agent.
 
 **File:** ${filename}
-${isDistFile ? '**NOTE:** This is a build artifact/compiled file.' : ''}
-${isDocFile ? '**NOTE:** This is a documentation file.' : ''}
-${isConfigFile ? '**NOTE:** This is a configuration file.' : ''}
+${fileType.notes ? `**NOTE:** ${fileType.notes}` : ''}
 
 **Code Changes:**
 \`\`\`diff
@@ -140,12 +398,15 @@ Analyze the code looking for these specific signals:
 - All comments following identical formatting style
 - Repetitive code structures across different sections
 
-**PRECISION INDICATORS (75-90% confidence):**
-- Single-character formatting fixes (adding newlines, spaces, commas)
-- Surgical precision changes with no side effects or additional modifications
-- Minimal, targeted fixes to specific formatting or syntax issues
-- Changes that follow exact patterns (e.g., consistently adding newlines to list items)
-- Simple string literal modifications for formatting consistency
+**PRECISION INDICATORS (Confidence varies by context):**
+- Single-character formatting fixes (adding newlines, spaces, commas) - 75-90% AI confidence UNLESS:
+  - PR has minimal/no description (suggests quick human fix)
+  - Changes are in CI/CD files (humans often make targeted workflow fixes)
+  - PR title suggests bug fix or correction (e.g., "Fix", "Correct", "Update")
+- Surgical precision changes with no side effects - Consider context
+- Minimal, targeted fixes to specific issues - Common in both human and AI work
+- Changes that follow exact patterns - Could be human applying consistent fix
+- Simple string literal modifications - Often human corrections
 
 **STYLISTIC PATTERNS (70-85% confidence):**
 - Comments explaining obvious code functionality  
@@ -155,16 +416,57 @@ Analyze the code looking for these specific signals:
 - Overly descriptive naming for simple concepts (e.g., "userDisplayNameString", "formatUserDisplayNameWithEmailAddress")
 - Verbose parameter names with unnecessary detail (e.g., "userAccountInformation" instead of "user")
 
+**CONTEXT-AWARE EVALUATION:**
+- Consider the PR title and description - minimal or terse descriptions often indicate human quick fixes
+- CI/CD workflow files (.github/workflows, etc.) are frequently fixed by humans with targeted changes
+- "Fix", "Correct", "Update" in PR titles often indicate human intervention
+- Small formatting changes in workflow files are commonly human-made to fix broken builds
+- Lack of verbose commit messages or descriptions can indicate human authorship
+
 **FOCUS ON DETECTING OBVIOUS AI PATTERNS:**
 - Look for CRITICAL SIGNALS first - these are definitive
 - Multiple STRUCTURAL FINGERPRINTS together suggest AI generation
-- PRECISION INDICATORS are strong signals for AI-generated formatting fixes
+- PRECISION INDICATORS must be evaluated WITH PR context - not in isolation
 - STYLISTIC PATTERNS may support AI detection but are not decisive alone
-- Small, surgical changes with perfect precision are typical of AI assistants
+- Small, surgical changes are common in BOTH human fixes and AI assistance
 - Absence of human indicators does NOT mean it's AI-generated
 - Professional, clean code is often written by skilled human developers
 
+**IMPORTANT: When evaluating minimal PRs with formatting changes:**
+- If PR has no description and title suggests a fix -> likely human
+- If changes are in CI/CD files -> likely human (humans often debug workflows)
+- If commit message is terse -> likely human
+- Default to human authorship for ambiguous cases
+
 Respond with your analysis in the exact format specified in the system prompt.`;
+  }
+
+  private getFileType(filename: string): { type: string; notes: string } {
+    if (
+      filename.startsWith('dist/') ||
+      filename.startsWith('lib/') ||
+      filename.startsWith('build/')
+    ) {
+      return { type: 'build', notes: 'This is a build artifact/compiled file.' };
+    }
+    if (filename.endsWith('.md') || filename.endsWith('.txt') || filename.includes('README')) {
+      return { type: 'doc', notes: 'This is a documentation file.' };
+    }
+    if (
+      filename.includes('.json') ||
+      filename.includes('.yml') ||
+      filename.includes('.yaml') ||
+      filename.includes('.toml')
+    ) {
+      return { type: 'config', notes: 'This is a configuration file.' };
+    }
+    if (filename.includes('.github/workflows') || filename.includes('ci/')) {
+      return {
+        type: 'ci',
+        notes: 'This is a CI/CD workflow file - humans often make targeted fixes here.',
+      };
+    }
+    return { type: 'code', notes: '' };
   }
 
   private parseResponse(content: string): LLMEvaluationResult {
@@ -196,58 +498,24 @@ Respond with your analysis in the exact format specified in the system prompt.`;
     const indicators: string[] = [];
     const lowerContent = content.toLowerCase();
 
-    if (lowerContent.includes('claude code') || lowerContent.includes('cursor')) {
-      indicators.push('ai-tool-attribution');
-    }
-    if (lowerContent.includes('debug') || lowerContent.includes('console.log')) {
-      indicators.push('debug-statements');
-    }
-    if (lowerContent.includes('todo') || lowerContent.includes('fixme')) {
-      indicators.push('todo-comments');
-    }
-    if (lowerContent.includes('typescript') || lowerContent.includes('types')) {
-      indicators.push('typescript-usage');
-    }
-    if (lowerContent.includes('consistent') || lowerContent.includes('formatted')) {
-      indicators.push('consistent-formatting');
-    }
-    if (
-      lowerContent.includes('surgical') ||
-      lowerContent.includes('precision') ||
-      lowerContent.includes('targeted')
-    ) {
-      indicators.push('precision-changes');
-    }
-    if (lowerContent.includes('newline') || lowerContent.includes('formatting fix')) {
-      indicators.push('formatting-fix');
-    }
-    if (
-      lowerContent.includes('verbose') ||
-      lowerContent.includes('descriptive naming') ||
-      lowerContent.includes('overly descriptive')
-    ) {
-      indicators.push('verbose-naming');
+    const indicatorMap = {
+      'ai-tool-attribution': ['claude code', 'cursor'],
+      'debug-statements': ['debug', 'console.log'],
+      'todo-comments': ['todo', 'fixme'],
+      'typescript-usage': ['typescript', 'types'],
+      'consistent-formatting': ['consistent', 'formatted'],
+      'precision-changes': ['surgical', 'precision', 'targeted'],
+      'formatting-fix': ['newline', 'formatting fix'],
+      'verbose-naming': ['verbose', 'descriptive naming', 'overly descriptive'],
+    };
+
+    for (const [indicator, patterns] of Object.entries(indicatorMap)) {
+      if (patterns.some((pattern) => lowerContent.includes(pattern))) {
+        indicators.push(indicator);
+      }
     }
 
     return indicators;
-  }
-
-  private buildOverallReasoning(
-    fileResults: FileAnalysis[],
-    humanLikeFiles: FileAnalysis[]
-  ): string {
-    const totalFiles = fileResults.length;
-    const humanFiles = humanLikeFiles.length;
-
-    if (humanFiles === 0) {
-      return `All ${totalFiles} file(s) appear to be AI-generated. Code shows consistent patterns typical of AI-assisted development.`;
-    }
-
-    if (humanFiles === totalFiles) {
-      return `All ${totalFiles} file(s) appear to be human-written. Code shows characteristics typical of human development patterns.`;
-    }
-
-    return `Mixed results: ${humanFiles} of ${totalFiles} file(s) appear human-written. This suggests a combination of human and AI contribution.`;
   }
 
   private aggregateIndicators(fileResults: FileAnalysis[]): string[] {
@@ -317,4 +585,18 @@ You must respond with a valid JSON object in this exact format:
 - STYLISTIC PATTERNS alone are not sufficient - these are common in professional code
 - When uncertain, err on the side of human authorship (confidence 40-60%)
 - Better to miss some AI code than falsely flag human developers
-- Focus on detecting obvious AI patterns, not ruling out human authorship`;
+- Focus on detecting obvious AI patterns, not ruling out human authorship
+
+**CONTEXT-AWARE EVALUATION RULES:**
+1. **Minimal PR descriptions** (empty or "No description provided") suggest human quick fixes
+2. **CI/CD file changes** (.github/workflows) are often human debugging efforts
+3. **Terse PR titles** ("Fix X", "Correct Y", "Update Z") indicate human intervention
+4. **Small formatting fixes** in workflow files are commonly human-made
+5. **Surgical changes WITHOUT other AI indicators** should default to human authorship
+6. **Consider the full context** - don't evaluate changes in isolation
+
+**When you see formatting-only changes:**
+- Check if it's a CI/CD file (likely human fix)
+- Check if PR has minimal description (likely human)
+- Check if title suggests a fix/correction (likely human)
+- Only flag as AI if you see OTHER strong AI indicators`;
