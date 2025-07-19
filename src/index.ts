@@ -57,8 +57,20 @@ async function run(): Promise<void> {
 
     core.info(`📁 Evaluating ${filesToEvaluate.length} file(s)...`);
 
-    // Evaluate using LLM
-    const evaluation = await evaluator.evaluatePullRequest(filesToEvaluate);
+    // Get commit messages
+    const { data: commits } = await octokit.rest.pulls.listCommits({
+      owner,
+      repo,
+      pull_number: prNumber,
+    });
+    const commitMessages = commits.map((c) => c.commit.message);
+
+    // Evaluate using LLM with PR context
+    const evaluation = await evaluator.evaluatePullRequest(filesToEvaluate, {
+      title: pr.title,
+      description: pr.body || undefined,
+      commitMessages,
+    });
     const { overallResult, fileResults } = evaluation;
 
     // Create check run
@@ -231,7 +243,14 @@ function isCodeFile(filename: string): boolean {
     '.vue',
     '.svelte',
     '.astro',
+    '.yml',
+    '.yaml',
   ];
+
+  // Include workflow files as code files
+  if (filename.includes('.github/workflows/')) {
+    return true;
+  }
 
   return codeExtensions.some((ext) => filename.endsWith(ext));
 }
