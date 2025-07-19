@@ -240,8 +240,8 @@ api.makeRequest('GET', '/users').then(function(result) {
       expect(result.overallResult).toBeDefined();
       expect(result.fileResults).toHaveLength(3);
 
-      // Should flag as human due to debug.js
-      expect(result.overallResult.isHumanLike).toBe(true);
+      // With stricter logic: 2 AI files with strong signals override 1 human file
+      expect(result.overallResult.isHumanLike).toBe(false);
 
       // Check specific file results
       const typesFile = result.fileResults.find((f) => f.filename === 'src/types.ts');
