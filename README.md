@@ -183,7 +183,7 @@ pnpm run eval add-pr <url> --human
 pnpm run eval run
 ```
 
-See [docs/EVAL.md](docs/EVAL.md) for details.
+See [docs/eval.md](docs/eval.md) for details.
 
 ### Individual PR Testing
 
