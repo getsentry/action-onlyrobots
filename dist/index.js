@@ -30191,8 +30191,17 @@ exports.LLMEvaluator = void 0;
 const openai_1 = __importDefault(__nccwpck_require__(1273));
 // Constants for evaluation
 const AI_INDICATORS = {
-    STRONG_SIGNALS: ['ai attribution', 'ai tool', 'claude', 'cursor', 'copilot'],
+    STRONG_SIGNALS: [
+        'ai attribution',
+        'ai tool',
+        'claude',
+        'cursor',
+        'copilot',
+        '🤖',
+        'co-authored-by',
+    ],
     FORMATTING: ['formatting-fix', 'precision-changes', 'consistent-formatting'],
+    CLAUDE_CODE_SPECIFIC: ['🤖 generated with', 'claude code', 'noreply@anthropic.com'],
 };
 const CONFIDENCE_ADJUSTMENTS = {
     NO_DESCRIPTION: -20,
@@ -30269,7 +30278,11 @@ class LLMEvaluator {
     hasStrongAISignals(fileResults) {
         return fileResults.some((f) => f.result.indicators.some((indicator) => {
             const indLower = indicator.toLowerCase();
-            return AI_INDICATORS.STRONG_SIGNALS.some((signal) => indLower.includes(signal));
+            // Check general AI signals
+            const hasGeneralSignal = AI_INDICATORS.STRONG_SIGNALS.some((signal) => indLower.includes(signal));
+            // Check Claude Code specific patterns
+            const hasClaudeCodeSignal = AI_INDICATORS.CLAUDE_CODE_SPECIFIC.some((signal) => indLower.includes(signal.toLowerCase()));
+            return hasGeneralSignal || hasClaudeCodeSignal;
         }));
     }
     buildAIDetectedResult(fileResults) {
@@ -30368,6 +30381,25 @@ class LLMEvaluator {
             indicators.push('formatting-fixes-with-human-context');
             confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.FORMATTING_WITH_CONTEXT;
         }
+        // Check for perfect conventional commits - strong AI signal
+        if (prContext.commitMessages && prContext.commitMessages.length > 2) {
+            const conventionalCommitPattern = /^(feat|fix|chore|docs|style|refactor|test|build|perf|ci)(\(.+\))?: .+/;
+            const allConventional = prContext.commitMessages.every((msg) => {
+                const firstLine = msg.split('\n')[0];
+                return conventionalCommitPattern.test(firstLine);
+            });
+            if (allConventional) {
+                indicators.push('perfect-conventional-commits');
+                confidenceAdjustment -= 25; // Strong AI signal
+            }
+        }
+        // Check for Claude Code signature
+        if (prContext.commitMessages?.some((msg) => msg.includes('🤖') ||
+            msg.includes('Claude Code') ||
+            msg.includes('Co-Authored-By: Claude'))) {
+            indicators.push('claude-code-signature');
+            confidenceAdjustment -= 50; // Very strong AI signal
+        }
         return { indicators, confidenceAdjustment };
     }
     isTerseFixTitle(title) {
@@ -30453,8 +30485,10 @@ Analyze the code looking for these specific signals:
 
 **CRITICAL SIGNALS (99% confidence if found):**
 - Direct mentions of AI tools in comments, commit messages, or code
-- Commit messages with perfect conventional commit format adherence  
-- Co-authored-by tags indicating AI pair programming
+- Claude Code signature: "🤖 Generated with [Claude Code](https://claude.ai/code)"
+- Co-authored-by tags: "Co-Authored-By: Claude <noreply@anthropic.com>"
+- Other AI tool mentions: Cursor, GitHub Copilot, ChatGPT
+- Commit messages with perfect conventional commit format adherence across multiple commits
 
 **STRUCTURAL FINGERPRINTS (85-95% confidence):**
 - Unnaturally perfect formatting consistency across the entire change
@@ -30480,6 +30514,9 @@ Analyze the code looking for these specific signals:
 - Perfect adherence to documentation examples
 - Overly descriptive naming for simple concepts (e.g., "userDisplayNameString", "formatUserDisplayNameWithEmailAddress")
 - Verbose parameter names with unnecessary detail (e.g., "userAccountInformation" instead of "user")
+- Systematic multi-file refactoring with consistent patterns (agent.py, config.py, tools.py structure)
+- Multi-step solutions with detailed PR descriptions explaining problem/solution/testing
+- Perfect modular architecture across related files
 
 **CONTEXT-AWARE EVALUATION:**
 - Consider the PR title and description - minimal or terse descriptions often indicate human quick fixes
@@ -30582,8 +30619,12 @@ const SYSTEM_PROMPT = `You are an expert code reviewer tasked with determining w
 
 **CRITICAL DETECTION SIGNALS (High Confidence):**
 1. **Direct AI Attribution**: Any mention of "Claude Code", "Cursor", "GitHub Copilot", "ChatGPT", "Claude", "Copilot", or similar AI tools in comments, commit messages, or code
-2. **AI Commit Message Patterns**: Auto-generated commit messages with phrases like "feat:", "fix:", "refactor:" following conventional commit formats too precisely
-3. **Co-authored by AI**: Commit metadata showing AI pair programming or co-authorship
+2. **Claude Code Signatures**: 
+   - "🤖 Generated with [Claude Code](https://claude.ai/code)" in commit messages
+   - "Co-Authored-By: Claude <noreply@anthropic.com>" in commits
+   - Robot emoji (🤖) in commit messages is highly indicative
+3. **AI Commit Message Patterns**: Perfect conventional commit format (feat:, fix:, chore:, docs:, style:, refactor:, test:, build:) across ALL commits in a PR
+4. **Co-authored by AI**: Commit metadata showing AI pair programming or co-authorship
 
 **STRUCTURAL FINGERPRINTS (Medium-High Confidence):**
 1. **Unnaturally Consistent Formatting**: Perfect indentation, spacing, and alignment across entire files

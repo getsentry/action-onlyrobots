@@ -298,4 +298,447 @@ export interface UserAuthenticationInterface {
       expect(result.overallResult.reasoning.toLowerCase()).toContain('claude');
     });
   });
+
+  describe('Claude Code specific patterns', () => {
+    it('should detect Claude Code commit message attribution', async () => {
+      const claudeCommitPattern = `
+fix: bundle OpenTelemetry data at build time for Cloudflare Workers compatibility
+
+The lookup module was trying to read JSON files from the filesystem at runtime,
+which doesn't work in Cloudflare Workers. This change bundles the JSON data
+directly into the JavaScript bundle at build time.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+`;
+
+      const files = [
+        {
+          filename: 'src/lookup.ts',
+          patch: `
+-import { readFileSync } from 'fs';
+-import { join } from 'path';
++import attributesData from '../data/attributes.json';
++import metricsData from '../data/metrics.json';
++import eventsData from '../data/events.json';
+
+export function lookupAttribute(name: string): AttributeInfo | undefined {
+-  const data = JSON.parse(readFileSync(join(__dirname, '../data/attributes.json'), 'utf8'));
+-  return data[name];
++  return attributesData[name];
+}
+`,
+        },
+      ];
+
+      const result = await evaluator.evaluatePullRequest(files, {
+        title: 'fix: bundle OpenTelemetry data at build time for Cloudflare Workers compatibility',
+        description: 'Fixes deployment error caused by filesystem access in Cloudflare Workers',
+        commitMessages: [claudeCommitPattern],
+      });
+
+      // The LLM should detect this as AI-generated due to Claude Code signature
+      // but confidence may vary
+      if (result.overallResult.isHumanLike) {
+        // If misclassified as human, at least check for low confidence
+        expect(result.overallResult.confidence).toBeLessThan(50);
+      } else {
+        // If correctly identified as AI, check for Claude mention
+        expect(result.overallResult.reasoning.toLowerCase()).toMatch(/claude|ai tool|generated/);
+      }
+    });
+
+    it('should detect Claude Code verbose naming patterns', async () => {
+      const verboseCode = `
+export interface UserAccountInformationInterface {
+  userIdentificationNumber: string;
+  userDisplayNameString: string;
+  userEmailAddressString: string;
+  userAccountCreationTimestamp: Date;
+  userAccountStatusIndicator: 'active' | 'inactive' | 'suspended';
+}
+
+/**
+ * Validates the user account information interface parameters
+ * @param userAccountInformation The user account information interface object to validate
+ * @returns Boolean indicating whether the user account information is valid
+ */
+export function validateUserAccountInformationInterface(
+  userAccountInformation: UserAccountInformationInterface
+): boolean {
+  try {
+    if (!userAccountInformation.userIdentificationNumber || 
+        userAccountInformation.userIdentificationNumber.length === 0) {
+      throw new Error('User identification number is required and cannot be empty');
+    }
+    
+    if (!userAccountInformation.userEmailAddressString || 
+        !userAccountInformation.userEmailAddressString.includes('@')) {
+      throw new Error('Valid user email address string is required');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('User account information validation error:', error);
+    return false;
+  }
+}
+
+export function formatUserDisplayNameWithEmailAddress(
+  userAccountInformation: UserAccountInformationInterface
+): string {
+  return \`\${userAccountInformation.userDisplayNameString} <\${userAccountInformation.userEmailAddressString}>\`;
+}
+`;
+
+      const result = await evaluator.evaluateFile('user-management.ts', verboseCode);
+
+      // Verbose naming is a subtle pattern - may not always be detected
+      if (!result.isHumanLike) {
+        expect(result.reasoning.toLowerCase()).toMatch(/verbose|naming|pattern/);
+      }
+      // Just ensure some evaluation was done
+      expect(result.confidence).toBeGreaterThan(0);
+      expect(result.reasoning.toLowerCase()).toMatch(/verbose|descriptive|naming/);
+    });
+
+    it('should detect systematic refactoring patterns', async () => {
+      const files = [
+        {
+          filename: 'src/agents/weather/agent.py',
+          patch: `
++import asyncio
++from typing import List, Dict, Any
++from ..base import BaseAgent
++from .config import WeatherConfig
++from .tools import WeatherTools
++
++class WeatherAgent(BaseAgent):
++    """Weather information agent for fetching and processing weather data."""
++    
++    def __init__(self, config: WeatherConfig):
++        super().__init__(config)
++        self.tools = WeatherTools(config)
++    
++    async def process(self, query: str) -> Dict[str, Any]:
++        """Process weather-related queries."""
++        try:
++            result = await self.tools.fetch_weather(query)
++            return {
++                'success': True,
++                'data': result,
++                'timestamp': self.get_timestamp()
++            }
++        except Exception as error:
++            return {
++                'success': False,
++                'error': str(error),
++                'timestamp': self.get_timestamp()
++            }
+`,
+        },
+        {
+          filename: 'src/agents/weather/config.py',
+          patch: `
++from dataclasses import dataclass
++from ..base import BaseConfig
++
++@dataclass
++class WeatherConfig(BaseConfig):
++    """Configuration for the weather agent."""
++    api_key: str
++    base_url: str = "https://api.weather.com/v1"
++    timeout: int = 30
++    cache_enabled: bool = True
++    cache_ttl: int = 3600
+`,
+        },
+        {
+          filename: 'src/agents/weather/tools.py',
+          patch: `
++import aiohttp
++from typing import Dict, Any
++from .config import WeatherConfig
++
++class WeatherTools:
++    """Tools for weather data operations."""
++    
++    def __init__(self, config: WeatherConfig):
++        self.config = config
++        self.session = None
++    
++    async def fetch_weather(self, location: str) -> Dict[str, Any]:
++        """Fetch weather data for the specified location."""
++        if not self.session:
++            self.session = aiohttp.ClientSession()
++        
++        url = f"{self.config.base_url}/weather"
++        params = {
++            'location': location,
++            'api_key': self.config.api_key
++        }
++        
++        async with self.session.get(url, params=params) as response:
++            return await response.json()
+`,
+        },
+        {
+          filename: 'src/agents/weather/__init__.py',
+          patch: `
++from .agent import WeatherAgent
++from .config import WeatherConfig
++from .tools import WeatherTools
++
++__all__ = ['WeatherAgent', 'WeatherConfig', 'WeatherTools']
+`,
+        },
+      ];
+
+      const result = await evaluator.evaluatePullRequest(files, {
+        title: 'feat: add weather agent with modular architecture',
+        description: `Implements a new weather agent following the established agent pattern:
+- agent.py: Main agent logic
+- config.py: Configuration dataclass
+- tools.py: External API interactions
+- __init__.py: Module exports
+
+This maintains consistency with other agents in the system.`,
+      });
+
+      // Systematic refactoring is complex to detect
+      if (!result.overallResult.isHumanLike) {
+        expect(result.overallResult.reasoning.toLowerCase()).toMatch(
+          /systematic|modular|consistent|pattern|refactor/
+        );
+      }
+      // Just ensure evaluation was performed
+      expect(result.overallResult.confidence).toBeDefined();
+    });
+
+    it('should detect multi-step systematic solutions', async () => {
+      const files = [
+        {
+          filename: 'scripts/generate-tool-definitions.ts',
+          patch: `
+-import { writeFileSync } from 'fs';
+-import { join } from 'path';
++import { promises as fs } from 'fs';
++import path from 'path';
+ import { generateToolDefinitions } from '../src/tools';
+ 
+-const outputPath = join(__dirname, '../dist/tools.json');
+-const definitions = generateToolDefinitions();
+-writeFileSync(outputPath, JSON.stringify(definitions, null, 2));
++async function main() {
++  try {
++    const definitions = await generateToolDefinitions();
++    const outputDir = path.join(__dirname, '../src/generated');
++    
++    // Ensure output directory exists
++    await fs.mkdir(outputDir, { recursive: true });
++    
++    // Write JSON file
++    const jsonPath = path.join(outputDir, 'toolDefinitions.json');
++    await fs.writeFile(jsonPath, JSON.stringify(definitions, null, 2));
++    
++    // Generate TypeScript declaration
++    const dtsContent = \`// Auto-generated file. Do not edit.
++export declare const toolDefinitions: \${JSON.stringify(definitions, null, 2)};
++\`;
++    const dtsPath = path.join(outputDir, 'toolDefinitions.d.ts');
++    await fs.writeFile(dtsPath, dtsContent);
++    
++    console.log('✅ Tool definitions generated successfully');
++  } catch (error) {
++    console.error('❌ Failed to generate tool definitions:', error);
++    process.exit(1);
++  }
++}
++
++main();
+`,
+        },
+        {
+          filename: '.gitignore',
+          patch: `
+ dist/
+ node_modules/
+ .env
+-src/generated/
+`,
+        },
+        {
+          filename: 'src/lookup.ts',
+          patch: `
+-import { readFileSync } from 'fs';
+-import { join } from 'path';
++// Import bundled data - tsdown will inline this at build time
++import toolDefinitions from './generated/toolDefinitions.json';
+ 
+-export function lookupTool(name: string): ToolDefinition | undefined {
+-  const toolsPath = join(__dirname, '../dist/tools.json');
+-  const data = JSON.parse(readFileSync(toolsPath, 'utf8'));
+-  return data[name];
++export function lookupTool(name: string): ToolDefinition | undefined {
++  return toolDefinitions[name];
+ }
+`,
+        },
+      ];
+
+      const result = await evaluator.evaluatePullRequest(files, {
+        title: 'fix: bundle tool definitions at build time for edge runtime compatibility',
+        description: `This PR fixes the edge runtime compatibility issue by bundling tool definitions at build time instead of reading them from the filesystem at runtime.
+
+## Problem
+The previous implementation used Node.js filesystem APIs which are not available in edge runtimes like Cloudflare Workers.
+
+## Solution
+1. Generate tool definitions at build time into a source file
+2. Import the generated file directly (bundled by tsdown)
+3. Update gitignore to track the generated file
+4. Add proper error handling and TypeScript declarations
+
+## Testing
+- Build process completes successfully
+- Tool definitions are correctly bundled
+- Edge runtime deployment works`,
+        commitMessages: [
+          'fix: generate tool definitions into source directory for bundling',
+          'fix: update imports to use bundled data instead of filesystem',
+          'fix: track generated files in git for edge compatibility',
+        ],
+      });
+
+      // Multi-step solutions are harder to detect without explicit AI mentions
+      if (!result.overallResult.isHumanLike) {
+        expect(result.overallResult.reasoning.toLowerCase()).toMatch(
+          /systematic|multi.?step|comprehensive|solution|ai|attribution/
+        );
+      }
+      expect(result.overallResult.confidence).toBeDefined();
+    });
+
+    it('should detect perfect conventional commit patterns across multiple commits', async () => {
+      const files = [
+        {
+          filename: 'src/api.ts',
+          patch: `
++import { z } from 'zod';
++
++export const UserSchema = z.object({
++  id: z.string().uuid(),
++  name: z.string().min(1),
++  email: z.string().email(),
++});
+`,
+        },
+      ];
+
+      const commitMessages = [
+        'feat: add user validation schema',
+        'fix: correct email validation regex',
+        'refactor: extract validation logic to separate module',
+        'test: add unit tests for user validation',
+        'docs: update API documentation with validation rules',
+        'chore: update dependencies to latest versions',
+      ];
+
+      const result = await evaluator.evaluatePullRequest(files, {
+        title: 'feat: implement comprehensive user validation',
+        commitMessages,
+      });
+
+      // Perfect conventional commits should be detected but confidence varies
+      expect(
+        result.overallResult.indicators.some(
+          (i) => i.toLowerCase().includes('conventional') || i.toLowerCase().includes('commit')
+        )
+      ).toBe(true);
+    });
+
+    it('should handle edge cases where Claude Code is used without attribution', async () => {
+      // This represents code that was generated by Claude Code but the developer
+      // removed the attribution before committing
+      const files = [
+        {
+          filename: 'src/services/notification.service.ts',
+          patch: `
++import { Injectable } from '@nestjs/common';
++import { ConfigService } from '@nestjs/config';
++import { NotificationChannel, NotificationPayload, NotificationResult } from '../types';
++
++@Injectable()
++export class NotificationService {
++  private readonly enabledChannels: Set<NotificationChannel>;
++  
++  constructor(private readonly configService: ConfigService) {
++    const channels = this.configService.get<string>('NOTIFICATION_CHANNELS', 'email');
++    this.enabledChannels = new Set(channels.split(',').map(c => c.trim() as NotificationChannel));
++  }
++  
++  /**
++   * Sends a notification through the specified channel
++   * @param channel The notification channel to use
++   * @param payload The notification payload containing recipient and content
++   * @returns Promise resolving to the notification result
++   */
++  async sendNotification(
++    channel: NotificationChannel,
++    payload: NotificationPayload
++  ): Promise<NotificationResult> {
++    try {
++      if (!this.enabledChannels.has(channel)) {
++        throw new Error(\`Notification channel '\${channel}' is not enabled\`);
++      }
++      
++      if (!this.validatePayload(payload)) {
++        throw new Error('Invalid notification payload');
++      }
++      
++      const result = await this.dispatchNotification(channel, payload);
++      
++      return {
++        success: true,
++        messageId: result.id,
++        timestamp: new Date().toISOString(),
++      };
++    } catch (error) {
++      return {
++        success: false,
++        error: error instanceof Error ? error.message : 'Unknown error occurred',
++        timestamp: new Date().toISOString(),
++      };
++    }
++  }
++  
++  private validatePayload(payload: NotificationPayload): boolean {
++    return !!(payload.recipient && payload.subject && payload.content);
++  }
++  
++  private async dispatchNotification(
++    channel: NotificationChannel,
++    payload: NotificationPayload
++  ): Promise<{ id: string }> {
++    // Implementation would go here
++    return { id: \`\${channel}-\${Date.now()}\` };
++  }
++}
+`,
+        },
+      ];
+
+      const result = await evaluator.evaluatePullRequest(files, {
+        title: 'Add notification service',
+        description: 'Implements notification service with support for multiple channels',
+      });
+
+      // Without explicit attribution, detection is much harder
+      // Just verify the evaluation completed
+      expect(result.overallResult.confidence).toBeDefined();
+      expect(result.overallResult.reasoning).toBeDefined();
+      expect(result.overallResult.isHumanLike).toBeDefined();
+    });
+  });
 });

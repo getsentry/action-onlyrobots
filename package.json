@@ -18,6 +18,7 @@
     "prepare": "simple-git-hooks",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval": "tsx src/eval/cli.ts",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "package": "pnpm run build:clean && pnpm run validate"
   },

@@ -170,6 +170,23 @@ pnpm run test-pr owner/repo#123 --format json
 
 ### Testing
 
+### Evaluation System
+
+We maintain a dataset of real PRs to test detection accuracy:
+
+```bash
+# Add PRs to dataset
+pnpm run eval add-pr <url> --ai --tool="Claude Code"
+pnpm run eval add-pr <url> --human
+
+# Run evaluation
+pnpm run eval run
+```
+
+See [docs/eval.md](docs/eval.md) for details.
+
+### Individual PR Testing
+
 The project includes comprehensive tests that validate the LLM evaluation functionality:
 
 1. **Setup**: Create a `.env` file with your OpenAI API key:

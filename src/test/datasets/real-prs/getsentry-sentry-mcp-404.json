@@ -1,0 +1,33 @@
+{
+  "id": "getsentry/sentry-mcp#404",
+  "url": "https://github.com/getsentry/sentry-mcp/pull/404",
+  "repo": "getsentry/sentry-mcp",
+  "prNumber": 404,
+  "title": "chore: update OnlyRobots action to use v1 tag",
+  "description": "## Summary\n- Update OnlyRobots GitHub Action from pinned version v1.2.0 to v1 tag for automatic updates\n- Testing GitHub Actions cache busting for the v1 tag\n\n## Changes\n- Modified `.github/workflows/onlyrobots.yml` to use `getsentry/action-onlyrobots@v1` instead of `@v1.2.0`\n- This allows the workflow to automatically receive patch and minor updates within the v1 major version\n- The v1 tag exists and includes the dist/index.js file, but there may be a cache issue preventing it from being found",
+  "author": "dcramer",
+  "createdAt": "2025-07-17T03:59:26Z",
+  "files": [
+    {
+      "filename": ".github/workflows/onlyrobots.yml",
+      "patch": "@@ -16,7 +16,7 @@ jobs:\n     steps:\n       - uses: actions/checkout@v4\n       \n-      - uses: getsentry/action-onlyrobots@v1.2.0\n+      - uses: getsentry/action-onlyrobots@v1\n         with:\n           openai-api-key: ${{ secrets.OPENAI_API_KEY }}\n           github-token: ${{ secrets.GITHUB_TOKEN }}"
+    }
+  ],
+  "context": {
+    "title": "chore: update OnlyRobots action to use v1 tag",
+    "description": "## Summary\n- Update OnlyRobots GitHub Action from pinned version v1.2.0 to v1 tag for automatic updates\n- Testing GitHub Actions cache busting for the v1 tag\n\n## Changes\n- Modified `.github/workflows/onlyrobots.yml` to use `getsentry/action-onlyrobots@v1` instead of `@v1.2.0`\n- This allows the workflow to automatically receive patch and minor updates within the v1 major version\n- The v1 tag exists and includes the dist/index.js file, but there may be a cache issue preventing it from being found",
+    "commitMessages": [
+      "chore: update OnlyRobots action to use v1 tag\n\nSwitch from v1.2.0 to v1 to automatically get latest v1.x updates",
+      "fix: remove unsupported post-comment parameter from OnlyRobots v1 action",
+      "fix: update OnlyRobots action to v1.3.0 to fix missing dist files",
+      "fix: restore post-comment parameter for OnlyRobots action",
+      "chore: update OnlyRobots action to use v1 tag"
+    ]
+  },
+  "metadata": {
+    "isAI": true,
+    "tool": "Claude Code",
+    "addedBy": "dcramer",
+    "addedAt": "2025-07-20T15:57:59.754Z"
+  }
+}
