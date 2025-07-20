@@ -16,10 +16,11 @@ const AI_INDICATORS = {
 } as const;
 
 const CONFIDENCE_ADJUSTMENTS = {
-  NO_DESCRIPTION: -15, // Less aggressive (was -20)
-  TERSE_TITLE: -10, // Less aggressive (was -15)
-  FORMATTING_WITH_CONTEXT: -5, // Less aggressive (was -10)
-  PERFECT_COMMITS: -35, // More aggressive for AI signal (new)
+  NO_DESCRIPTION: -10, // Reduced penalty - AI can generate PRs without descriptions but it's less common
+  FORMATTING_WITH_CONTEXT: -5, // Keep small penalty for formatting-only changes
+  PERFECT_COMMITS: -20, // Reduced - many humans use conventional commits
+  VERBOSE_NAMING: -30, // AI often uses overly descriptive names
+  COMPREHENSIVE_COMMENTS: -25, // AI tends to over-comment
 } as const;
 
 export interface LLMEvaluationResult {
@@ -156,24 +157,22 @@ export class LLMEvaluator {
   private hasStrongPRSignals(prContext: PRContext): boolean {
     // Check for Claude Code signature in commit messages or PR description
     const hasClaudeSignature =
-      prContext.commitMessages?.some(
+      (prContext.commitMessages?.some(
         (msg) =>
           msg.includes('🤖') ||
           msg.includes('Claude Code') ||
           msg.includes('Co-Authored-By: Claude') ||
           msg.includes('Generated with [Claude Code]')
-      ) ||
-      false ||
-      prContext.description?.includes('Claude Code') ||
-      false ||
-      prContext.description?.includes('🤖') ||
-      false;
+      ) ??
+        false) ||
+      (prContext.description?.includes('Claude Code') ?? false) ||
+      (prContext.description?.includes('🤖') ?? false);
 
     // Check for other AI tool mentions
     const hasAIToolMention =
       prContext.commitMessages?.some((msg) =>
         AI_INDICATORS.STRONG_SIGNALS.some((signal) => msg.toLowerCase().includes(signal))
-      ) || false;
+      ) ?? false;
 
     if (prContext.description) {
       const descLower = prContext.description.toLowerCase();
@@ -349,16 +348,21 @@ export class LLMEvaluator {
       confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.NO_DESCRIPTION;
     }
 
-    // Check for terse fix/correct titles
-    if (prContext.title) {
-      const titleLower = prContext.title.toLowerCase();
-      if (this.isTerseFixTitle(titleLower)) {
-        indicators.push('terse-fix-title');
-        confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.TERSE_TITLE;
-      }
-    }
+    // Note: Removed terse title check - AI commonly uses fix/update/correct prefixes too
 
     // Note: Removed CI/CD bias - AI can generate any type of file including CI/CD workflows
+
+    // Check for verbose naming patterns (AI indicator)
+    if (this.hasVerboseNamingPatterns(fileResults)) {
+      indicators.push('verbose-naming-patterns');
+      confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.VERBOSE_NAMING;
+    }
+
+    // Check for comprehensive commenting (AI indicator)
+    if (this.hasComprehensiveComments(fileResults)) {
+      indicators.push('comprehensive-commenting');
+      confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.COMPREHENSIVE_COMMENTS;
+    }
 
     // Check for formatting-only changes with human context
     if (this.areFormattingOnlyChanges(fileResults) && indicators.length > 0) {
@@ -397,21 +401,42 @@ export class LLMEvaluator {
     return { indicators, confidenceAdjustment };
   }
 
-  private isTerseFixTitle(title: string): boolean {
-    return (
-      title.startsWith('fix') ||
-      title.startsWith('correct') ||
-      title.startsWith('update') ||
-      !!title.match(/^(fix|correct|update)\s+\w+/)
-    );
-  }
-
   private areFormattingOnlyChanges(fileResults: FileAnalysis[]): boolean {
     return fileResults.every((f) =>
       f.result.indicators.some((ind) =>
         AI_INDICATORS.FORMATTING.some((format) => ind.toLowerCase().includes(format))
       )
     );
+  }
+
+  private hasVerboseNamingPatterns(fileResults: FileAnalysis[]): boolean {
+    // Check if multiple files mention verbose naming
+    const verboseCount = fileResults.filter((f) =>
+      f.result.indicators.some(
+        (ind) =>
+          ind.toLowerCase().includes('verbose') ||
+          ind.toLowerCase().includes('overly descriptive') ||
+          ind.toLowerCase().includes('userAccountInformation') ||
+          ind.toLowerCase().includes('formatUserDisplayName')
+      )
+    ).length;
+
+    return verboseCount >= 2 || (verboseCount === 1 && fileResults.length === 1);
+  }
+
+  private hasComprehensiveComments(fileResults: FileAnalysis[]): boolean {
+    // Check if files have comprehensive commenting patterns
+    const commentCount = fileResults.filter((f) =>
+      f.result.indicators.some(
+        (ind) =>
+          (ind.toLowerCase().includes('comprehensive') && ind.toLowerCase().includes('comment')) ||
+          ind.toLowerCase().includes('jsdoc') ||
+          ind.toLowerCase().includes('detailed comments') ||
+          ind.toLowerCase().includes('extensive documentation')
+      )
+    ).length;
+
+    return commentCount >= 2 || (commentCount === 1 && fileResults.length === 1);
   }
 
   private analyzePRDescription(description?: string): {
@@ -517,7 +542,7 @@ export class LLMEvaluator {
     fileResults: FileAnalysis[],
     humanLikeFiles: FileAnalysis[],
     prIndicators: { indicators: string[]; confidenceAdjustment: number },
-    prContext?: PRContext
+    _prContext?: PRContext
   ): string {
     const totalFiles = fileResults.length;
     const humanFiles = humanLikeFiles.length;
@@ -528,11 +553,12 @@ export class LLMEvaluator {
     if (prIndicators.indicators.length > 0) {
       reasoning += 'PR-level analysis suggests human authorship: ';
 
+      // Add human pattern indicators to reasoning
       if (prIndicators.indicators.includes('no-pr-description')) {
         reasoning += 'No PR description provided (typical of quick human fixes). ';
       }
-      if (prIndicators.indicators.includes('terse-fix-title')) {
-        reasoning += `Terse PR title "${prContext?.title}" indicates human intervention. `;
+      if (prIndicators.indicators.includes('formatting-fixes-with-human-context')) {
+        reasoning += 'Formatting-only changes in human context. ';
       }
       if (prIndicators.indicators.includes('ci-workflow-changes-only')) {
         reasoning += 'Changes only affect CI/CD workflows (commonly human debugging). ';
@@ -779,12 +805,15 @@ You must respond with a valid JSON object in this exact format:
 - Focus on detecting obvious AI patterns, not ruling out human authorship
 
 **CONTEXT-AWARE EVALUATION RULES:**
-1. **Minimal PR descriptions** (empty or "No description provided") suggest human quick fixes
-2. **Terse PR titles** ("Fix X", "Correct Y", "Update Z") indicate human intervention
-3. **Surgical changes WITHOUT other AI indicators** should default to human authorship
-4. **Consider the full context** - don't evaluate changes in isolation
+1. **Consider the full context** - don't evaluate changes in isolation
+2. **Surgical changes WITHOUT other AI indicators** should default to human authorship
+3. **Empty PR descriptions** can suggest quick human fixes
+4. **AI-specific patterns to look for**:
+   - Verbose naming (userAccountInformation, formatUserDisplayNameWithEmailAddress)
+   - Over-commenting and excessive documentation
+   - Perfect JSDoc on every function
+   - Overly descriptive variable names for simple concepts
 
 **When you see formatting-only changes:**
-- Check if PR has minimal description (likely human)
-- Check if title suggests a fix/correction (likely human)
-- Only flag as AI if you see OTHER strong AI indicators`;
+- Only flag as AI if you see OTHER strong AI indicators
+- Formatting changes alone are not enough to determine AI authorship`;
