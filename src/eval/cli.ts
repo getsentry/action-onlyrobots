@@ -17,11 +17,13 @@ program
   .command('run')
   .description('Run evaluation on all PRs in the dataset')
   .option('--limit <number>', 'Limit number of PRs to evaluate', parseInt)
+  .option('--concurrency <number>', 'Number of PRs to evaluate in parallel (default: 4)', parseInt)
   .action(async (options) => {
     try {
       const runner = new EvalRunner();
       await runner.runEvaluation({
         limit: options.limit,
+        concurrency: options.concurrency || 4,
       });
     } catch (error) {
       console.error('Error:', error);
