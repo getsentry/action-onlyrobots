@@ -175,4 +175,14 @@ program
     }
   });
 
+// If no command is provided, default to 'run'
+const args = process.argv.slice(2);
+const hasCommand =
+  args.length > 0 &&
+  !args[0].startsWith('-') &&
+  ['run', 'add-pr', 'stats', 'list'].includes(args[0]);
+if (!hasCommand) {
+  process.argv.splice(2, 0, 'run');
+}
+
 program.parse();

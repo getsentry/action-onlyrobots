@@ -16,10 +16,11 @@ const AI_INDICATORS = {
 } as const;
 
 const CONFIDENCE_ADJUSTMENTS = {
-  NO_DESCRIPTION: -20,
-  TERSE_TITLE: -15,
-  CI_FILES_ONLY: -25,
-  FORMATTING_WITH_CONTEXT: -10,
+  NO_DESCRIPTION: -15, // Less aggressive (was -20)
+  TERSE_TITLE: -10, // Less aggressive (was -15)
+  CI_FILES_ONLY: -10, // Much less aggressive (was -25)
+  FORMATTING_WITH_CONTEXT: -5, // Less aggressive (was -10)
+  PERFECT_COMMITS: -35, // More aggressive for AI signal (new)
 } as const;
 
 export interface LLMEvaluationResult {
@@ -107,9 +108,14 @@ export class LLMEvaluator {
     // Evaluate each file individually
     const fileResults = await this.evaluateFiles(files);
 
-    // Check for strong AI signals that should never be overridden
+    // Check for strong AI signals in files
     if (this.hasStrongAISignals(fileResults)) {
       return this.buildAIDetectedResult(fileResults);
+    }
+
+    // Check for strong AI signals in PR context (Claude Code signature, etc.)
+    if (prContext && this.hasStrongPRSignals(prContext)) {
+      return this.buildAIDetectedResult(fileResults, prContext);
     }
 
     // Apply PR context adjustments for ambiguous cases
@@ -148,7 +154,42 @@ export class LLMEvaluator {
     );
   }
 
-  private buildAIDetectedResult(fileResults: FileAnalysis[]): {
+  private hasStrongPRSignals(prContext: PRContext): boolean {
+    // Check for Claude Code signature in commit messages or PR description
+    const hasClaudeSignature =
+      prContext.commitMessages?.some(
+        (msg) =>
+          msg.includes('🤖') ||
+          msg.includes('Claude Code') ||
+          msg.includes('Co-Authored-By: Claude') ||
+          msg.includes('Generated with [Claude Code]')
+      ) ||
+      false ||
+      prContext.description?.includes('Claude Code') ||
+      false ||
+      prContext.description?.includes('🤖') ||
+      false;
+
+    // Check for other AI tool mentions
+    const hasAIToolMention =
+      prContext.commitMessages?.some((msg) =>
+        AI_INDICATORS.STRONG_SIGNALS.some((signal) => msg.toLowerCase().includes(signal))
+      ) || false;
+
+    if (prContext.description) {
+      const descLower = prContext.description.toLowerCase();
+      if (AI_INDICATORS.STRONG_SIGNALS.some((signal) => descLower.includes(signal))) {
+        return true;
+      }
+    }
+
+    return hasClaudeSignature || hasAIToolMention;
+  }
+
+  private buildAIDetectedResult(
+    fileResults: FileAnalysis[],
+    prContext?: PRContext
+  ): {
     overallResult: LLMEvaluationResult;
     fileResults: FileAnalysis[];
   } {
@@ -157,18 +198,33 @@ export class LLMEvaluator {
       fileResults.reduce((sum, f) => sum + f.result.confidence, 0) / fileResults.length;
 
     const aiTools = this.extractAITools(fileResults);
-    const reasoning = `Strong AI attribution detected in ${
-      fileResults.length - humanLikeFiles.length
-    } file(s). Code explicitly mentions AI tool usage${
-      aiTools.length > 0 ? ` (${aiTools.join(', ')})` : ''
-    }.`;
+    let reasoning = `Strong AI attribution detected. `;
+
+    // Add specific reason for detection
+    if (prContext && this.hasStrongPRSignals(prContext)) {
+      reasoning +=
+        'PR context explicitly mentions AI tool usage (Claude Code, Cursor, Copilot, etc.).';
+    } else {
+      const aiFileCount = fileResults.length - humanLikeFiles.length;
+      reasoning += `${aiFileCount} file(s) contain AI tool references${
+        aiTools.length > 0 ? ` (${aiTools.join(', ')})` : ''
+      }.`;
+    }
+
+    const indicators = [...this.aggregateIndicators(fileResults)];
+
+    // Add PR context indicators if available
+    if (prContext) {
+      const prIndicators = this.analyzePRContext(fileResults, prContext);
+      indicators.push(...prIndicators.indicators);
+    }
 
     return {
       overallResult: {
         isHumanLike: false,
-        confidence: avgConfidence,
+        confidence: Math.max(avgConfidence, 90), // Very high confidence for strong signals
         reasoning,
-        indicators: this.aggregateIndicators(fileResults),
+        indicators,
       },
       fileResults,
     };
@@ -188,12 +244,28 @@ export class LLMEvaluator {
     let avgConfidence =
       fileResults.reduce((sum, f) => sum + f.result.confidence, 0) / fileResults.length;
 
+    // Analyze PR description for AI patterns
+    const prDescAnalysis = this.analyzePRDescription(prContext?.description);
+
     // More sophisticated decision logic:
     // - Majority of files must be AI-generated to flag as AI
     // - Consider confidence levels
+    // - PR description patterns can influence decision
     let isHumanLike = true; // Default to human
 
-    if (aiFiles.length > humanLikeFiles.length) {
+    // Special handling for non-code files (LICENSE, configs, etc.)
+    const isNonCodePR = fileResults.every(
+      (f) =>
+        f.filename.match(/\.(md|txt|LICENSE|json|ya?ml|toml)$/i) ||
+        f.filename.includes('LICENSE') ||
+        f.result.indicators.length === 0
+    );
+
+    if (isNonCodePR && prDescAnalysis.isAIStyled) {
+      // For non-code files, rely heavily on PR-level analysis
+      isHumanLike = false;
+      avgConfidence = Math.max(avgConfidence, prDescAnalysis.confidence);
+    } else if (aiFiles.length > humanLikeFiles.length) {
       // Majority are AI files
       const aiConfidenceAvg =
         aiFiles.reduce((sum, f) => sum + f.result.confidence, 0) / aiFiles.length;
@@ -202,6 +274,10 @@ export class LLMEvaluator {
       if (aiConfidenceAvg > 75) {
         isHumanLike = false;
       }
+    } else if (prDescAnalysis.isAIStyled && avgConfidence < 50) {
+      // Files are ambiguous but PR description is AI-styled
+      isHumanLike = false;
+      avgConfidence = Math.max(avgConfidence, prDescAnalysis.confidence * 0.8);
     }
 
     // Apply PR context adjustments
@@ -233,7 +309,11 @@ export class LLMEvaluator {
           isHumanLike,
           confidence: isHumanLike ? 100 - avgConfidence : avgConfidence,
           reasoning,
-          indicators: [...this.aggregateIndicators(fileResults), ...prIndicators.indicators],
+          indicators: [
+            ...this.aggregateIndicators(fileResults),
+            ...prIndicators.indicators,
+            ...prDescAnalysis.indicators,
+          ],
         },
         fileResults,
       };
@@ -302,7 +382,7 @@ export class LLMEvaluator {
 
       if (allConventional) {
         indicators.push('perfect-conventional-commits');
-        confidenceAdjustment -= 25; // Strong AI signal
+        confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.PERFECT_COMMITS;
       }
     }
 
@@ -316,7 +396,7 @@ export class LLMEvaluator {
       )
     ) {
       indicators.push('claude-code-signature');
-      confidenceAdjustment -= 50; // Very strong AI signal
+      confidenceAdjustment -= 100; // Absolute AI signal - should never be overridden
     }
 
     return { indicators, confidenceAdjustment };
@@ -343,6 +423,74 @@ export class LLMEvaluator {
         AI_INDICATORS.FORMATTING.some((format) => ind.toLowerCase().includes(format))
       )
     );
+  }
+
+  private analyzePRDescription(description?: string): {
+    isAIStyled: boolean;
+    indicators: string[];
+    confidence: number;
+  } {
+    if (!description || description.trim() === '') {
+      return { isAIStyled: false, indicators: [], confidence: 0 };
+    }
+
+    const indicators: string[] = [];
+    let aiScore = 0;
+
+    // Check for structured markdown sections
+    if (description.includes('## Summary') || description.includes('## Changes')) {
+      indicators.push('structured-markdown-sections');
+      aiScore += 20;
+    }
+
+    // Check for task list with checkboxes
+    if (description.match(/- \[x\]/g)?.length ?? 0 >= 2) {
+      indicators.push('checkbox-task-list');
+      aiScore += 15;
+    }
+
+    // Check for perfect formatting and grammar
+    const hasBulletPoints = (description.match(/^- /gm)?.length ?? 0) >= 2;
+    const hasNoTypos = !description.match(/\b(teh|taht|thsi|wiht|becuase|recieve)\b/i);
+    const hasConsistentFormatting = description
+      .split('\n')
+      .every((line) => line.trim() === '' || line.match(/^(#+\s|[-*]\s|\d+\.\s|\s{2,})/));
+
+    if (hasBulletPoints && hasNoTypos && hasConsistentFormatting) {
+      indicators.push('perfect-formatting');
+      aiScore += 20;
+    }
+
+    // Check for comprehensive test plan
+    if (description.match(/test plan|testing/i) && description.includes('[x]')) {
+      indicators.push('comprehensive-test-plan');
+      aiScore += 15;
+    }
+
+    // Check for AI-typical phrasing
+    const aiPhrases = [
+      'ensure proper',
+      'compliance',
+      'best practices',
+      'comprehensive',
+      'robust',
+      'scalable',
+      'maintainable',
+      'optimized',
+    ];
+    const phraseMatches = aiPhrases.filter((phrase) =>
+      description.toLowerCase().includes(phrase)
+    ).length;
+    if (phraseMatches >= 2) {
+      indicators.push('ai-typical-phrasing');
+      aiScore += 10;
+    }
+
+    return {
+      isAIStyled: aiScore >= 40,
+      indicators,
+      confidence: Math.min(aiScore, 95),
+    };
   }
 
   private extractAITools(fileResults: FileAnalysis[]): string[] {
