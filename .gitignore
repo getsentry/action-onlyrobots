@@ -79,3 +79,6 @@ jspm_packages/
 # Temporary folders
 tmp/
 temp/
+
+# Evaluation results (can be regenerated)
+eval-results/
