@@ -18,7 +18,6 @@ const AI_INDICATORS = {
 const CONFIDENCE_ADJUSTMENTS = {
   NO_DESCRIPTION: -15, // Less aggressive (was -20)
   TERSE_TITLE: -10, // Less aggressive (was -15)
-  CI_FILES_ONLY: -10, // Much less aggressive (was -25)
   FORMATTING_WITH_CONTEXT: -5, // Less aggressive (was -10)
   PERFECT_COMMITS: -35, // More aggressive for AI signal (new)
 } as const;
@@ -359,11 +358,7 @@ export class LLMEvaluator {
       }
     }
 
-    // Check if all changes are in CI/CD files
-    if (this.areAllCIFiles(fileResults)) {
-      indicators.push('ci-workflow-changes-only');
-      confidenceAdjustment += CONFIDENCE_ADJUSTMENTS.CI_FILES_ONLY;
-    }
+    // Note: Removed CI/CD bias - AI can generate any type of file including CI/CD workflows
 
     // Check for formatting-only changes with human context
     if (this.areFormattingOnlyChanges(fileResults) && indicators.length > 0) {
@@ -408,12 +403,6 @@ export class LLMEvaluator {
       title.startsWith('correct') ||
       title.startsWith('update') ||
       !!title.match(/^(fix|correct|update)\s+\w+/)
-    );
-  }
-
-  private areAllCIFiles(fileResults: FileAnalysis[]): boolean {
-    return fileResults.every(
-      (f) => f.filename.includes('.github/workflows') || f.filename.includes('ci/')
     );
   }
 
@@ -791,14 +780,11 @@ You must respond with a valid JSON object in this exact format:
 
 **CONTEXT-AWARE EVALUATION RULES:**
 1. **Minimal PR descriptions** (empty or "No description provided") suggest human quick fixes
-2. **CI/CD file changes** (.github/workflows) are often human debugging efforts
-3. **Terse PR titles** ("Fix X", "Correct Y", "Update Z") indicate human intervention
-4. **Small formatting fixes** in workflow files are commonly human-made
-5. **Surgical changes WITHOUT other AI indicators** should default to human authorship
-6. **Consider the full context** - don't evaluate changes in isolation
+2. **Terse PR titles** ("Fix X", "Correct Y", "Update Z") indicate human intervention
+3. **Surgical changes WITHOUT other AI indicators** should default to human authorship
+4. **Consider the full context** - don't evaluate changes in isolation
 
 **When you see formatting-only changes:**
-- Check if it's a CI/CD file (likely human fix)
 - Check if PR has minimal description (likely human)
 - Check if title suggests a fix/correction (likely human)
 - Only flag as AI if you see OTHER strong AI indicators`;
