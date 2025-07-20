@@ -1,0 +1,98 @@
+{
+  "totalPRs": 2,
+  "correct": 2,
+  "incorrect": 0,
+  "accuracy": 1,
+  "falsePositives": 0,
+  "falseNegatives": 0,
+  "byTool": {
+    "Claude Code": {
+      "total": 2,
+      "correct": 2,
+      "accuracy": 1
+    }
+  },
+  "avgConfidence": {
+    "overall": 69.8076923076923,
+    "correct": 69.8076923076923,
+    "incorrect": 0
+  },
+  "results": [
+    {
+      "pr": {
+        "url": "https://github.com/getsentry/sentry-mcp/pull/347",
+        "title": "chore: update dependencies",
+        "author": "dcramer",
+        "tool": "Claude Code"
+      },
+      "expected": {
+        "isAI": true,
+        "tool": "Claude Code"
+      },
+      "actual": {
+        "isAI": true,
+        "confidence": 70,
+        "reasoning": "Strong AI attribution detected in 0 file(s). Code explicitly mentions AI tool usage.",
+        "indicators": [
+          "Minimal changes to dependency versions",
+          "No AI tool mentions",
+          "No overly consistent formatting or naming"
+        ]
+      },
+      "correct": true,
+      "toolCorrect": false,
+      "duration": 5706
+    },
+    {
+      "pr": {
+        "url": "https://github.com/getsentry/sentry-mcp/pull/406",
+        "title": "fix: bundle OpenTelemetry data at build time for Cloudflare Workers compatibility",
+        "author": "dcramer",
+        "tool": "Claude Code"
+      },
+      "expected": {
+        "isAI": true,
+        "tool": "Claude Code"
+      },
+      "actual": {
+        "isAI": true,
+        "confidence": 69.61538461538461,
+        "reasoning": "Strong AI attribution detected in 0 file(s). Code explicitly mentions AI tool usage.",
+        "indicators": [
+          "minimal changes",
+          "no AI tool mentions",
+          "simple additions",
+          "lack of detailed PR description",
+          "Minimal change to devDependencies",
+          "No critical AI signals present",
+          "Lack of verbose commit messages",
+          "Targeted fix suggests human intervention",
+          "Single-character formatting fix",
+          "Minimal change in a configuration file",
+          "No critical AI signals found",
+          "Targeted changes to script commands",
+          "No overly descriptive naming patterns",
+          "Minimal changes consistent with human adjustments",
+          "No direct AI tool mentions",
+          "Terse commit message",
+          "Contextually relevant changes",
+          "No perfect conventional commit format",
+          "Consistent variable naming",
+          "Organized code structure",
+          "Clear comments without excessive verbosity",
+          "Minor formatting changes present",
+          "Comments explaining code functionality",
+          "No overly descriptive variable naming patterns",
+          "Consistent formatting across the code",
+          "Descriptive variable naming",
+          "No direct AI tool mentions or signatures",
+          "no critical AI signals",
+          "consistent formatting typical for configuration files"
+        ]
+      },
+      "correct": true,
+      "toolCorrect": false,
+      "duration": 31215
+    }
+  ]
+}

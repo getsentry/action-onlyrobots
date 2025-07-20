@@ -1,0 +1,26 @@
+{
+  "id": "getsentry/sentry-mcp#409",
+  "url": "https://github.com/getsentry/sentry-mcp/pull/409",
+  "repo": "getsentry/sentry-mcp",
+  "prNumber": 409,
+  "title": "chore: Remove overwatch CLI in favor of per-commit",
+  "description": "With this [PR](https://github.com/codecov/overwatch/pull/449/files), I added `getsentry/sentry-mcp` to the feature-flagged repos which are configured to have the overwatch bug predictor run on every commit. \r\n\r\nAs a result, we no longer need this stopgap that triggered the overwatch CLI. This PR removes/cleans up the old github action.\r\n\r\nHere's an [example](https://github.com/getsentry/sentry-mcp/pull/408#issuecomment-3091358730) of what the comment should look like now.\r\n\r\nCloses https://linear.app/getsentry/issue/PREVENT-187/sentry-mcp-repo",
+  "author": "suejung-sentry",
+  "createdAt": "2025-07-19T01:38:54Z",
+  "files": [
+    {
+      "filename": ".github/workflows/bug-prediction.yml",
+      "patch": "@@ -1,33 +0,0 @@\n-name: Bug Prediction (Overwatch)\n-\n-on:\n-  pull_request:\n-    types:\n-      - opened\n-      - synchronize\n-\n-permissions:\n-  contents: read\n-\n-jobs:\n-  upload-overwatch:\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Checkout\n-        uses: actions/checkout@v4\n-\n-      - name: Install Overwatch CLI\n-        run: |\n-          curl -o overwatch-cli https://overwatch.codecov.io/linux/cli\n-          chmod +x overwatch-cli\n-\n-      # Using --upload-empty-on-error flag to force this step through.\n-      # This workflow is a temporary workaround until this alpha feature \n-      # is merged into AI PR review\n-      - name: Run Overwatch CLI\n-        run: |\n-          ./overwatch-cli \\\n-            --auth-token ${{ secrets.OVERWATCH_SENTRY_AUTH_TOKEN }} \\\n-            --organization-slug sentry \\\n-            --upload-empty-on-error \\\n-            typescript --package-manager pnpm --eslint-pattern src"
+    }
+  ],
+  "context": {
+    "title": "chore: Remove overwatch CLI in favor of per-commit",
+    "description": "With this [PR](https://github.com/codecov/overwatch/pull/449/files), I added `getsentry/sentry-mcp` to the feature-flagged repos which are configured to have the overwatch bug predictor run on every commit. \r\n\r\nAs a result, we no longer need this stopgap that triggered the overwatch CLI. This PR removes/cleans up the old github action.\r\n\r\nHere's an [example](https://github.com/getsentry/sentry-mcp/pull/408#issuecomment-3091358730) of what the comment should look like now.\r\n\r\nCloses https://linear.app/getsentry/issue/PREVENT-187/sentry-mcp-repo",
+    "commitMessages": ["chore: Remove overwatch CLI in favor of per-commit"]
+  },
+  "metadata": {
+    "isAI": false,
+    "addedBy": "dcramer",
+    "addedAt": "2025-07-20T15:57:53.904Z"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "getsentry/action-onlyrobots#12",
+  "url": "https://github.com/getsentry/action-onlyrobots/pull/12",
+  "repo": "getsentry/action-onlyrobots",
+  "prNumber": 12,
+  "title": "Correct tag behavior",
+  "description": "",
+  "author": "dcramer",
+  "createdAt": "2025-07-17T04:30:12Z",
+  "files": [
+    {
+      "filename": ".github/workflows/release.yml",
+      "patch": "@@ -10,52 +10,52 @@ permissions:\n jobs:\n   release:\n     runs-on: ubuntu-latest\n-      \n+\n     steps:\n       - name: Checkout\n         uses: actions/checkout@v4\n         with:\n           fetch-depth: 0\n-          \n+\n       - name: Setup Node.js\n         uses: actions/setup-node@v4\n         with:\n-          node-version: '20'\n-          \n+          node-version: \"20\"\n+\n       - name: Install pnpm\n         uses: pnpm/action-setup@v4\n-          \n+\n       - name: Get pnpm store directory\n         id: pnpm-cache\n         shell: bash\n         run: |\n           echo \"STORE_PATH=$(pnpm store path)\" >> $GITHUB_OUTPUT\n-      \n+\n       - name: Setup pnpm cache\n         uses: actions/cache@v4\n         with:\n           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}\n           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}\n           restore-keys: |\n             ${{ runner.os }}-pnpm-store-\n-          \n+\n       - name: Install dependencies\n         run: pnpm install --frozen-lockfile\n-        \n+\n       - name: Build the action\n         run: pnpm run build\n-        \n+\n       - name: Run tests\n         run: pnpm run test\n         env:\n           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}\n-          \n+\n       - name: Run type checking\n         run: pnpm run typecheck\n-        \n+\n       - name: Run linting\n         run: pnpm run lint\n-        \n+\n       - name: Extract version from tag\n         id: version\n         run: |\n@@ -65,30 +65,30 @@ jobs:\n           echo \"version=$VERSION\" >> $GITHUB_OUTPUT\n           echo \"major_version=v$MAJOR_VERSION\" >> $GITHUB_OUTPUT\n           echo \"tag_name=$TAG_NAME\" >> $GITHUB_OUTPUT\n-          \n+\n       - name: Update package.json version\n         run: |\n           npm version ${{ steps.version.outputs.version }} --no-git-tag-version\n-          \n+\n       - name: Rebuild with updated version\n         run: pnpm run build\n-        \n+\n       - name: Configure Git\n         run: |\n           git config user.name \"github-actions[bot]\"\n           git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\"\n-          \n+\n       - name: Commit built files\n         run: |\n           git add dist/ package.json\n           git commit -m \"Release ${{ steps.version.outputs.tag_name }}\"\n-          \n-      - name: Create or update major version tag\n-        run: |\n-          git tag -f ${{ steps.version.outputs.major_version }} ${{ steps.version.outputs.tag_name }}\n-          git push origin ${{ steps.version.outputs.major_version }} --force\n-          \n+\n       - name: Push changes to release tag\n         run: |\n           git tag -f ${{ steps.version.outputs.tag_name }}\n-          git push origin ${{ steps.version.outputs.tag_name }} --force\n\\ No newline at end of file\n+          git push origin ${{ steps.version.outputs.tag_name }} --force\n+\n+      - name: Create or update major version tag\n+        run: |\n+          git tag -f ${{ steps.version.outputs.major_version }}\n+          git push origin ${{ steps.version.outputs.major_version }} --force"
+    }
+  ],
+  "context": {
+    "title": "Correct tag behavior",
+    "description": "",
+    "commitMessages": ["Correct tag behavior"]
+  },
+  "metadata": {
+    "isAI": false,
+    "addedBy": "dcramer",
+    "addedAt": "2025-07-20T15:59:17.868Z"
+  }
+}

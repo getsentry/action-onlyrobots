@@ -1,0 +1,16 @@
+# Example PR list for bulk import
+# Format: URL,ai/human,tool,confidence,notes
+
+# Claude Code examples
+https://github.com/getsentry/sentry-mcp/pull/406,ai,Claude Code,95,Cloudflare Workers compatibility fix
+https://github.com/monarch-initiative/monarch-agent/pull/17,ai,Claude Code,90,Large-scale async refactoring
+
+# Human examples  
+https://github.com/facebook/react/pull/28000,human,,,Quick CI fix
+https://github.com/nodejs/node/pull/50000,human,,,Typo fix in docs
+
+# Cursor examples
+https://github.com/example/repo/pull/123,ai,Cursor,85,DataTable component with sorting
+
+# Mixed/unclear
+https://github.com/example/repo/pull/456,ai,,60,Possibly AI-assisted but no clear attribution
