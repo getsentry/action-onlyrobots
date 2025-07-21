@@ -1,0 +1,39 @@
+{
+  "id": "getsentry/sentry#95934",
+  "url": "https://github.com/getsentry/sentry/pull/95934",
+  "repo": "getsentry/sentry",
+  "prNumber": 95934,
+  "title": "Expose Sentry MCP configuration endpoint",
+  "description": "<!-- Describe your PR here. -->\r\nExposes a `/.well-known/mcp.json` endpoint to provide configuration details for Sentry's MCP server.\r\n\r\nThis PR:\r\n*   Adds a new endpoint at `/.well-known/mcp.json`.\r\n*   Serves a JSON payload containing Sentry's MCP name, description, and endpoint.\r\n*   Returns a 404 Not Found for self-hosted instances, mirroring the `security.txt` behavior.\r\n*   Includes appropriate caching headers.\r\n*   Adds tests to verify behavior in both SaaS and self-hosted modes.\r\n\r\n<!--\r\n\r\n  Sentry employees and contractors can delete or ignore the following.\r\n\r\n-->\r\n\r\n### Legal Boilerplate\r\n\r\nLook, I get it. The entity doing business as \"Sentry\" was incorporated in the State of Delaware in 2015 as Functional Software, Inc. and is gonna need some rights from me in order to utilize my contributions in this here PR. So here's the deal: I retain all rights, title and interest in and to my contributions, and by keeping this boilerplate intact I confirm that Sentry can use, modify, copy, and redistribute my contributions, under Sentry's choice of terms.\r\n\r\n---\r\n\r\n[Slack Thread](https://sentry.slack.com/archives/C039ZGT5K/p1752789064523719?thread_ts=1752789064.523719&cid=C039ZGT5K)",
+  "author": "dcramer",
+  "createdAt": "2025-07-18T20:47:36Z",
+  "files": [
+    {
+      "filename": "src/sentry/web/api.py",
+      "patch": "@@ -60,6 +60,12 @@\n -----END PGP SIGNATURE-----\n \"\"\"\n \n+MCP_CONFIG = {\n+    \"name\": \"Sentry\",\n+    \"description\": \"Connect to Sentry, debug faster.\",\n+    \"endpoint\": \"https://mcp.sentry.dev/mcp\",\n+}\n+\n \n class ClientConfigView(BaseView):\n     def get(self, request: Request) -> HttpResponse:\n@@ -82,6 +88,14 @@ def security_txt(request):\n     return HttpResponse(SECURITY, content_type=\"text/plain\")\n \n \n+@cache_control(max_age=3600, public=True)\n+def mcp_json(request):\n+    if settings.SENTRY_MODE == SentryMode.SELF_HOSTED:\n+        return HttpResponse(status=404)\n+\n+    return HttpResponse(json.dumps(MCP_CONFIG), content_type=\"application/json\")\n+\n+\n @cache_control(max_age=60)\n def crossdomain_xml(request, project_id):\n     if SiloMode.get_current_mode() == SiloMode.CONTROL or (not project_id.isdigit()):"
+    },
+    {
+      "filename": "src/sentry/web/urls.py",
+      "patch": "@@ -1220,6 +1220,11 @@\n         api.security_txt,\n         name=\"sentry-security-txt\",\n     ),\n+    re_path(\n+        r\"^\\.well-known/mcp\\.json$\",\n+        api.mcp_json,\n+        name=\"sentry-mcp-json\",\n+    ),\n     # Force a 404 of favicon.ico.\n     # This url is commonly requested by browsers, and without\n     # blocking this, it was treated as a 200 OK for a react page view."
+    },
+    {
+      "filename": "tests/sentry/web/test_api.py",
+      "patch": "@@ -720,3 +720,35 @@ def test_customer_domain(self):\n         data = json.loads(resp.content)\n         assert not data[\"isAuthenticated\"]\n         assert data[\"customerDomain\"] is None\n+\n+\n+class McpJsonTest(TestCase):\n+    @cached_property\n+    def path(self):\n+        return reverse(\"sentry-mcp-json\")\n+\n+    def test_mcp_json_saas_mode(self):\n+        with override_settings(SENTRY_MODE=\"saas\"):\n+            response = self.client.get(\"/.well-known/mcp.json\")\n+\n+        assert response.status_code == 200\n+        assert response[\"Content-Type\"] == \"application/json\"\n+\n+        data = json.loads(response.content)\n+        assert data[\"name\"] == \"Sentry\"\n+        assert data[\"description\"] == \"Connect to Sentry, debug faster.\"\n+        assert data[\"endpoint\"] == \"https://mcp.sentry.dev/mcp\"\n+\n+    def test_mcp_json_self_hosted_mode(self):\n+        with override_settings(SENTRY_MODE=\"self_hosted\"):\n+            response = self.client.get(\"/.well-known/mcp.json\")\n+\n+        assert response.status_code == 404\n+\n+    def test_mcp_json_cache_control(self):\n+        with override_settings(SENTRY_MODE=\"saas\"):\n+            response = self.client.get(\"/.well-known/mcp.json\")\n+\n+        assert response.status_code == 200\n+        assert \"max-age=3600\" in response[\"Cache-Control\"]\n+        assert \"public\" in response[\"Cache-Control\"]"
+    }
+  ],
+  "context": {
+    "title": "Expose Sentry MCP configuration endpoint",
+    "description": "<!-- Describe your PR here. -->\r\nExposes a `/.well-known/mcp.json` endpoint to provide configuration details for Sentry's MCP server.\r\n\r\nThis PR:\r\n*   Adds a new endpoint at `/.well-known/mcp.json`.\r\n*   Serves a JSON payload containing Sentry's MCP name, description, and endpoint.\r\n*   Returns a 404 Not Found for self-hosted instances, mirroring the `security.txt` behavior.\r\n*   Includes appropriate caching headers.\r\n*   Adds tests to verify behavior in both SaaS and self-hosted modes.\r\n\r\n<!--\r\n\r\n  Sentry employees and contractors can delete or ignore the following.\r\n\r\n-->\r\n\r\n### Legal Boilerplate\r\n\r\nLook, I get it. The entity doing business as \"Sentry\" was incorporated in the State of Delaware in 2015 as Functional Software, Inc. and is gonna need some rights from me in order to utilize my contributions in this here PR. So here's the deal: I retain all rights, title and interest in and to my contributions, and by keeping this boilerplate intact I confirm that Sentry can use, modify, copy, and redistribute my contributions, under Sentry's choice of terms.\r\n\r\n---\r\n\r\n[Slack Thread](https://sentry.slack.com/archives/C039ZGT5K/p1752789064523719?thread_ts=1752789064.523719&cid=C039ZGT5K)",
+    "commitMessages": [
+      "Add /.well-known/mcp.json endpoint for Sentry MCP configuration\n\nCo-authored-by: david <david@sentry.io>",
+      "Remove MCP implementation summary documentation file\n\nCo-authored-by: david <david@sentry.io>",
+      ":hammer_and_wrench: apply pre-commit fixes"
+    ]
+  },
+  "metadata": {
+    "isAI": true,
+    "tool": "Cursor",
+    "addedBy": "dcramer",
+    "addedAt": "2025-07-20T23:14:59.681Z"
+  }
+}

@@ -94,7 +94,18 @@ pnpm run lint:fix
 
 ## Evaluation Strategy
 
-The LLM evaluator uses OpenAI's GPT-4o-mini to analyze code changes and determine if they appear human or AI-generated:
+The LLM evaluator uses OpenAI's GPT-4o-mini to analyze code changes and determine if they appear human or AI-generated.
+
+### Core Principle: Err on the Side of Not Failing PRs
+
+**CRITICAL**: The system is designed to DEFAULT TO HUMAN AUTHORSHIP. We prioritize avoiding false positives (incorrectly blocking human developers) over catching all AI-generated code. This means:
+
+- **Default assumption**: Code is human-written unless proven otherwise
+- **High confidence required**: Only flag as AI when confidence is >75% with strong indicators
+- **PR context matters**: Human patterns (no description, terse titles, CI/CD changes) can override AI detection
+- **Better to miss AI code than falsely flag human developers**
+
+### Detection Indicators
 
 **Priority Indicators:**
 - **AI Tool Attribution**: Direct mentions of "Claude Code", "Cursor", "GitHub Copilot", etc.

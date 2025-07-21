@@ -55,7 +55,7 @@ export class EvalRunner {
     this.loader = new RealPRLoader();
   }
 
-  async runEvaluation(filter?: { limit?: number }): Promise<EvalSummary> {
+  async runEvaluation(filter?: { limit?: number; concurrency?: number }): Promise<EvalSummary> {
     console.log('🚀 Starting PR evaluation...\n');
 
     // Load all PRs
@@ -72,61 +72,100 @@ export class EvalRunner {
       prs = prs.slice(0, filter.limit);
     }
 
-    // Run evaluations
+    // Run evaluations with configurable concurrency
+    const concurrency = filter?.concurrency || 4;
+    console.log(`\n🔄 Running with concurrency: ${concurrency}`);
+
     const results: EvalResult[] = [];
-    let completed = 0;
+    const errors: Array<{ pr: any; error: any }> = [];
 
-    for (const pr of prs) {
-      const startTime = Date.now();
+    // Process PRs in batches
+    let processedCount = 0;
+    for (let i = 0; i < prs.length; i += concurrency) {
+      const batch = prs.slice(i, Math.min(i + concurrency, prs.length));
 
-      try {
-        console.log(`\n[${completed + 1}/${prs.length}] Evaluating: ${pr.url}`);
-        console.log(`   Title: ${pr.title}`);
-        console.log(
-          `   Expected: ${pr.metadata.isAI ? `AI (${pr.metadata.tool || 'unknown'})` : 'Human'}`
-        );
+      // Show batch progress
+      console.log(
+        `\n⏳ Processing batch ${Math.floor(i / concurrency) + 1}/${Math.ceil(prs.length / concurrency)} (PRs ${i + 1}-${Math.min(i + batch.length, prs.length)})...`
+      );
 
-        const result = await this.evaluator.evaluatePullRequest(pr.files, pr.context);
-        const duration = Date.now() - startTime;
+      const batchPromises = batch.map(async (pr, batchIndex) => {
+        const prIndex = i + batchIndex + 1;
+        const startTime = Date.now();
 
-        const isAI = !result.overallResult.isHumanLike;
-        const correct = isAI === pr.metadata.isAI;
+        try {
+          const result = await this.evaluator.evaluatePullRequest(pr.files, pr.context);
+          const duration = Date.now() - startTime;
 
-        console.log(
-          `   Detected: ${isAI ? 'AI' : 'Human'} (${result.overallResult.confidence}% confidence)`
-        );
-        console.log(`   Result: ${correct ? '✅ Correct' : '❌ Incorrect'}`);
+          const isAI = !result.overallResult.isHumanLike;
+          const correct = isAI === pr.metadata.isAI;
 
-        results.push({
-          pr: {
-            url: pr.url,
-            title: pr.title,
-            author: pr.author,
-            tool: pr.metadata.tool,
-          },
-          expected: {
-            isAI: pr.metadata.isAI,
-            tool: pr.metadata.tool,
-          },
-          actual: {
-            isAI,
-            confidence: result.overallResult.confidence,
-            reasoning: result.overallResult.reasoning,
-            indicators: result.overallResult.indicators,
-          },
-          correct,
-          toolCorrect: pr.metadata.tool
-            ? result.overallResult.reasoning.toLowerCase().includes(pr.metadata.tool.toLowerCase())
-            : undefined,
-          duration,
-        });
+          return {
+            prIndex,
+            pr: {
+              url: pr.url,
+              title: pr.title,
+              author: pr.author,
+              tool: pr.metadata.tool,
+            },
+            expected: {
+              isAI: pr.metadata.isAI,
+              tool: pr.metadata.tool,
+            },
+            actual: {
+              isAI,
+              confidence: result.overallResult.confidence,
+              reasoning: result.overallResult.reasoning,
+              indicators: result.overallResult.indicators,
+            },
+            correct,
+            toolCorrect: pr.metadata.tool
+              ? result.overallResult.reasoning
+                  .toLowerCase()
+                  .includes(pr.metadata.tool.toLowerCase())
+              : undefined,
+            duration,
+          };
+        } catch (error) {
+          errors.push({ pr, error });
+          return {
+            prIndex,
+            pr,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-        completed++;
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
 
-        // Rate limiting
+      // Display results in order
+      for (const result of batchResults.sort((a, b) => a.prIndex - b.prIndex)) {
+        processedCount++;
+
+        if ('error' in result) {
+          console.log(`\n[${result.prIndex}/${prs.length}] ❌ Failed: ${result.pr.url}`);
+          console.log(`   Error: ${result.error}`);
+        } else {
+          console.log(`\n[${result.prIndex}/${prs.length}] ${result.pr.url}`);
+          console.log(`   Title: ${result.pr.title}`);
+          console.log(
+            `   Expected: ${result.expected.isAI ? `AI (${result.expected.tool || 'unknown'})` : 'Human'}`
+          );
+          console.log(
+            `   Detected: ${result.actual.isAI ? 'AI' : 'Human'} (${result.actual.confidence}% confidence)`
+          );
+          console.log(`   Result: ${result.correct ? '✅ Correct' : '❌ Incorrect'}`);
+          console.log(`   Duration: ${(result.duration / 1000).toFixed(1)}s`);
+
+          results.push(result);
+        }
+      }
+
+      // Rate limiting between batches (only if not the last batch)
+      if (i + concurrency < prs.length) {
+        console.log('\n⏱️  Rate limiting pause...');
         await new Promise((resolve) => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.log(`   ❌ Error: ${error}`);
       }
     }
 

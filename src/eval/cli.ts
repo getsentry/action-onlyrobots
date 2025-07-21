@@ -17,11 +17,13 @@ program
   .command('run')
   .description('Run evaluation on all PRs in the dataset')
   .option('--limit <number>', 'Limit number of PRs to evaluate', parseInt)
+  .option('--concurrency <number>', 'Number of PRs to evaluate in parallel (default: 4)', parseInt)
   .action(async (options) => {
     try {
       const runner = new EvalRunner();
       await runner.runEvaluation({
         limit: options.limit,
+        concurrency: options.concurrency || 4,
       });
     } catch (error) {
       console.error('Error:', error);
@@ -174,5 +176,15 @@ program
       process.exit(1);
     }
   });
+
+// If no command is provided, default to 'run'
+const args = process.argv.slice(2);
+const hasCommand =
+  args.length > 0 &&
+  !args[0].startsWith('-') &&
+  ['run', 'add-pr', 'stats', 'list'].includes(args[0]);
+if (!hasCommand) {
+  process.argv.splice(2, 0, 'run');
+}
 
 program.parse();
