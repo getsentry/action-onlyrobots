@@ -266,8 +266,7 @@ export function formatUserDisplayNameWithEmailAddress(userAccountInformation: Us
 
       expect(resultWithContext.overallResult.isHumanLike).toBe(true);
       expect(resultWithContext.overallResult.indicators).toContain('no-pr-description');
-      expect(resultWithContext.overallResult.indicators).toContain('terse-fix-title');
-      expect(resultWithContext.overallResult.indicators).toContain('ci-workflow-changes-only');
+      // Note: terse-fix-title and ci-workflow-changes-only were removed as they were invalid biases
       expect(resultWithContext.overallResult.reasoning.toLowerCase()).toContain(
         'pr-level analysis'
       );
