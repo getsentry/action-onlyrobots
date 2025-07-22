@@ -11,6 +11,7 @@
     "build:clean": "rm -rf dist && pnpm run build",
     "start": "node dist/cli.js",
     "test-pr": "tsx src/test-cli.ts",
+    "test-simplified": "tsx src/test-simplified.ts",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write",
     "lint": "pnpm run typecheck && biome lint",
@@ -19,6 +20,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx src/eval/cli.ts",
+    "eval:simplified": "tsx src/eval/runner-simplified.ts",
+    "eval:v3": "tsx src/eval/runner-v3.ts",
+    "eval:reversed": "tsx src/eval/runner-reversed.ts",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "package": "pnpm run build:clean && pnpm run validate"
   },

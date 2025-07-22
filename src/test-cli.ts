@@ -195,8 +195,10 @@ async function main() {
       OPENAI_API_KEY: openaiKey,
     });
 
-    // Fetch PR data
+    // Fetch PR data and context
     console.log(`🔄 Fetching PR data for ${prRef.owner}/${prRef.repo}#${prRef.number}...`);
+
+    // Fetch PR files
     const prData = await github.fetchPullRequestFiles(prRef.owner, prRef.repo, prRef.number);
 
     if (prData.length === 0) {
@@ -204,11 +206,65 @@ async function main() {
       process.exit(0);
     }
 
+    // Fetch PR context (title, description, author, commits)
+    const prResponse = await fetch(
+      `https://api.github.com/repos/${prRef.owner}/${prRef.repo}/pulls/${prRef.number}`,
+      {
+        headers: githubToken
+          ? {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github+json',
+              'User-Agent': 'action-onlyrobots-cli/1.0',
+            }
+          : {
+              Accept: 'application/vnd.github+json',
+              'User-Agent': 'action-onlyrobots-cli/1.0',
+            },
+      }
+    );
+
+    if (!prResponse.ok) {
+      console.error(`❌ Failed to fetch PR context: ${prResponse.statusText}`);
+      process.exit(1);
+    }
+
+    const prInfo = (await prResponse.json()) as any;
+
+    // Fetch commit messages
+    const commitsResponse = await fetch(
+      `https://api.github.com/repos/${prRef.owner}/${prRef.repo}/pulls/${prRef.number}/commits`,
+      {
+        headers: githubToken
+          ? {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github+json',
+              'User-Agent': 'action-onlyrobots-cli/1.0',
+            }
+          : {
+              Accept: 'application/vnd.github+json',
+              'User-Agent': 'action-onlyrobots-cli/1.0',
+            },
+      }
+    );
+
+    const commitMessages = commitsResponse.ok
+      ? ((await commitsResponse.json()) as any[]).map((commit: any) => commit.commit.message)
+      : [];
+
+    const prContext = {
+      title: prInfo.title,
+      description: prInfo.body,
+      author: prInfo.user?.login,
+      commitMessages,
+    };
+
     console.log(`📄 Found ${prData.length} file(s) to analyze`);
+    console.log(`👤 Author: ${prContext.author}`);
+    console.log(`📝 Title: ${prContext.title}`);
 
     // Evaluate the PR
     console.log('🧠 Running LLM evaluation...');
-    const result = await evaluator.evaluatePullRequest(prData);
+    const result = await evaluator.evaluatePullRequest(prData, prContext);
 
     // Format and display results
     formatResults(

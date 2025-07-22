@@ -59,6 +59,26 @@ pnpm run lint
 pnpm run lint:fix
 ```
 
+### Testing and Evaluation
+
+```bash
+# Test a specific PR
+pnpm run test-pr https://github.com/owner/repo/pull/123
+
+# Add PRs to fixtures for evaluation
+pnpm run eval add-pr <url> --ai --tool="Claude Code"  # AI-generated PR
+pnpm run eval add-pr <url> --human                    # Human-written PR
+
+# Run evaluation on all fixtures
+pnpm run eval run
+
+# View dataset statistics
+pnpm run eval stats
+
+# List all PRs in dataset
+pnpm run eval list
+```
+
 ## Code Validation Requirements
 
 **MANDATORY after ANY code changes:**
@@ -117,6 +137,26 @@ The LLM evaluator uses OpenAI's GPT-4o-mini to analyze code changes and determin
 - Debugging artifacts and temporary code
 - TypeScript usage patterns
 - Error handling and code structure
+
+## Adding PRs to Test Fixtures
+
+When you find PRs that are incorrectly classified, add them to the evaluation dataset:
+
+```bash
+# For AI-generated PRs (false negatives)
+pnpm run eval add-pr https://github.com/getsentry/sentry-mcp/pull/416 --ai --tool="Claude Code"
+
+# For human-written PRs (false positives)
+pnpm run eval add-pr <url> --human
+
+# Add notes for special cases
+pnpm run eval add-pr <url> --ai --notes="Complex refactoring with AI assistance"
+```
+
+The PRs are stored in `src/test/datasets/real-prs/` as individual JSON files and used to:
+- Measure detection accuracy
+- Identify patterns in misclassifications
+- Improve the evaluation algorithm
 
 ## Deployment Notes
 

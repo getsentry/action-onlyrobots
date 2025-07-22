@@ -70,6 +70,7 @@ async function run(): Promise<void> {
       title: pr.title,
       description: pr.body || undefined,
       commitMessages,
+      author: pr.user?.login,
     });
     const { overallResult, fileResults } = evaluation;
 
