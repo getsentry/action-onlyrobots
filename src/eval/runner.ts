@@ -153,7 +153,7 @@ export class EvalRunner {
             `   Expected: ${result.expected.isAI ? `AI (${result.expected.tool || 'unknown'})` : 'Human'}`
           );
           console.log(
-            `   Detected: ${result.actual.isAI ? 'AI' : 'Human'} (${result.actual.confidence}% confidence)`
+            `   Detected: ${result.actual.isAI ? 'AI' : 'Human'} (${Math.round(result.actual.confidence)}% confidence)`
           );
           console.log(`   Result: ${result.correct ? '✅ Correct' : '❌ Incorrect'}`);
           console.log(`   Duration: ${(result.duration / 1000).toFixed(1)}s`);
@@ -235,7 +235,7 @@ export class EvalRunner {
 
   private average(nums: number[]): number {
     if (nums.length === 0) return 0;
-    return nums.reduce((a, b) => a + b, 0) / nums.length;
+    return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
   }
 
   private printSummary(summary: EvalSummary): void {
@@ -271,7 +271,7 @@ export class EvalRunner {
       for (const error of errors.slice(0, 5)) {
         console.log(`   ${error.pr.url}`);
         console.log(
-          `      Expected: ${error.expected.isAI ? 'AI' : 'Human'}, Got: ${error.actual.isAI ? 'AI' : 'Human'} (${error.actual.confidence}%)`
+          `      Expected: ${error.expected.isAI ? 'AI' : 'Human'}, Got: ${error.actual.isAI ? 'AI' : 'Human'} (${Math.round(error.actual.confidence)}%)`
         );
       }
       if (errors.length > 5) {
