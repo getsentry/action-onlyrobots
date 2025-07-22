@@ -512,14 +512,9 @@ export function formatUserDisplayNameWithEmailAddress(
 This maintains consistency with other agents in the system.`,
       });
 
-      // Systematic refactoring is complex to detect
-      if (!result.overallResult.isHumanLike) {
-        expect(result.overallResult.reasoning.toLowerCase()).toMatch(
-          /systematic|modular|consistent|pattern|refactor/
-        );
-      }
-      // Just ensure evaluation was performed
-      expect(result.overallResult.confidence).toBeDefined();
+      // Systematic refactoring patterns should be detected as AI
+      expect(result.overallResult.isHumanLike).toBe(false);
+      expect(result.overallResult.confidence).toBeGreaterThan(50);
     });
 
     it('should detect multi-step systematic solutions', async () => {
