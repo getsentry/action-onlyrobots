@@ -1,0 +1,27 @@
+{
+  "id": "getsentry/sentry-mcp#414",
+  "url": "https://github.com/getsentry/sentry-mcp/pull/414",
+  "repo": "getsentry/sentry-mcp",
+  "prNumber": 414,
+  "title": "fix: add SENTRY_AUTH_TOKEN to deploy workflow for sourcemap uploads",
+  "description": "## Summary\n- Fixes sourcemap upload to Sentry during production builds by adding the missing `SENTRY_AUTH_TOKEN` environment variable to the GitHub Actions deploy workflow\n\n## Context\nThe Sentry Vite plugin was configured correctly but couldn't upload sourcemaps during CI builds because the authentication token wasn't available. This prevented proper error tracking and debugging in production.\n\n## Test plan\n- Ensure `SENTRY_AUTH_TOKEN` secret is configured in GitHub repository settings\n- Deploy to production will now successfully upload sourcemaps to Sentry\n- Production errors will show proper stack traces with source code context\n\n---\n*This fix was implemented with Claude Code*",
+  "author": "dcramer",
+  "createdAt": "2025-07-22T01:05:41Z",
+  "files": [
+    {
+      "filename": ".github/workflows/deploy.yml",
+      "patch": "@@ -50,6 +50,8 @@ jobs:\n \n       - name: Build\n         run: pnpm build\n+        env:\n+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}\n \n       - name: Deploy to Cloudflare\n         uses: cloudflare/wrangler-action@v3"
+    }
+  ],
+  "context": {
+    "title": "fix: add SENTRY_AUTH_TOKEN to deploy workflow for sourcemap uploads",
+    "description": "## Summary\n- Fixes sourcemap upload to Sentry during production builds by adding the missing `SENTRY_AUTH_TOKEN` environment variable to the GitHub Actions deploy workflow\n\n## Context\nThe Sentry Vite plugin was configured correctly but couldn't upload sourcemaps during CI builds because the authentication token wasn't available. This prevented proper error tracking and debugging in production.\n\n## Test plan\n- Ensure `SENTRY_AUTH_TOKEN` secret is configured in GitHub repository settings\n- Deploy to production will now successfully upload sourcemaps to Sentry\n- Production errors will show proper stack traces with source code context\n\n---\n*This fix was implemented with Claude Code*",
+    "commitMessages": ["fix: add SENTRY_AUTH_TOKEN to deploy workflow for sourcemap uploads"]
+  },
+  "metadata": {
+    "isAI": true,
+    "tool": "Claude Code",
+    "addedBy": "dcramer",
+    "addedAt": "2025-07-22T01:16:18.444Z"
+  }
+}
