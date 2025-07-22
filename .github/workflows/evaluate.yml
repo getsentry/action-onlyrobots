@@ -1,0 +1,90 @@
+name: Evaluate AI Detection
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/evaluate.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Run evaluation
+        id: eval
+        run: |
+          # Run evaluation
+          pnpm run eval run
+          
+          # Find the latest results file
+          LATEST_RESULTS=$(ls -t eval-results/eval-*.json | head -1)
+          
+          # Format results for PR comment
+          pnpm tsx scripts/format-eval-results.ts "$LATEST_RESULTS" > formatted-results.md
+          
+          # Set multiline output
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          cat formatted-results.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Also save raw accuracy for status check
+          ACCURACY=$(jq -r '.accuracy' "$LATEST_RESULTS")
+          echo "accuracy=$ACCURACY" >> $GITHUB_OUTPUT
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '🤖 AI Detection Evaluation Results'
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ${{ steps.eval.outputs.summary }}
+          edit-mode: replace
+
+      - name: Set status check
+        if: always()
+        run: |
+          ACCURACY="${{ steps.eval.outputs.accuracy }}"
+          if [ -z "$ACCURACY" ]; then
+            echo "❌ Evaluation failed - no accuracy data"
+            exit 1
+          fi
+          
+          # Convert to percentage
+          ACCURACY_PCT=$(echo "$ACCURACY * 100" | bc -l | xargs printf "%.1f")
+          
+          echo "✅ Evaluation completed with ${ACCURACY_PCT}% accuracy"
