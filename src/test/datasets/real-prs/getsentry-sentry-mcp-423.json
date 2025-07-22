@@ -1,0 +1,29 @@
+{
+  "id": "getsentry/sentry-mcp#423",
+  "url": "https://github.com/getsentry/sentry-mcp/pull/423",
+  "repo": "getsentry/sentry-mcp",
+  "prNumber": 423,
+  "title": "Removing the versioning callout to the header component. ",
+  "description": "Simple fix to remove the versioning withing the header component. No need to have it and it currently shows 0.0.0 which feel like a bug.\r\n\r\n**Now you see it**\r\n<img width=\"365\" height=\"132\" alt=\"Screenshot 2025-07-22 at 1 08 14 PM\" src=\"https://github.com/user-attachments/assets/3450d4ee-6f6e-4a14-ab24-333423b81b59\" />\r\n\r\n**Now you dont**\r\n<img width=\"359\" height=\"121\" alt=\"Screenshot 2025-07-22 at 1 08 08 PM\" src=\"https://github.com/user-attachments/assets/ad9a1347-371f-43d4-ad4d-5840488622d0\" />\r\n",
+  "author": "jmanhart",
+  "createdAt": "2025-07-22T20:12:02Z",
+  "files": [
+    {
+      "filename": "packages/mcp-cloudflare/src/client/components/ui/header.tsx",
+      "patch": "@@ -2,7 +2,6 @@ import type React from \"react\";\n import { SentryIcon } from \"./icons/sentry\";\n import { Github, LogOut } from \"lucide-react\";\n import { Button } from \"./button\";\n-import { LIB_VERSION } from \"@sentry/mcp-server/version\";\n \n interface HeaderProps {\n   isAuthenticated?: boolean;\n@@ -20,7 +19,6 @@ export const Header: React.FC<HeaderProps> = ({\n           <SentryIcon className=\"h-8 w-8 text-violet-400\" />\n           <div className=\"flex items-baseline gap-2\">\n             <h1 className=\"text-2xl font-bold whitespace-nowrap\">Sentry MCP</h1>\n-            <span className=\"text-sm text-muted-foreground\">{LIB_VERSION}</span>\n           </div>\n         </div>\n         <div className=\"flex items-center gap-2\">"
+    }
+  ],
+  "context": {
+    "title": "Removing the versioning callout to the header component. ",
+    "description": "Simple fix to remove the versioning withing the header component. No need to have it and it currently shows 0.0.0 which feel like a bug.\r\n\r\n**Now you see it**\r\n<img width=\"365\" height=\"132\" alt=\"Screenshot 2025-07-22 at 1 08 14 PM\" src=\"https://github.com/user-attachments/assets/3450d4ee-6f6e-4a14-ab24-333423b81b59\" />\r\n\r\n**Now you dont**\r\n<img width=\"359\" height=\"121\" alt=\"Screenshot 2025-07-22 at 1 08 08 PM\" src=\"https://github.com/user-attachments/assets/ad9a1347-371f-43d4-ad4d-5840488622d0\" />\r\n",
+    "commitMessages": [
+      "Removing the versioning callout to the header component. No need to have it"
+    ]
+  },
+  "metadata": {
+    "isAI": false,
+    "notes": "Simple fix removing version display with typo in description",
+    "addedBy": "dcramer",
+    "addedAt": "2025-07-22T20:41:11.790Z"
+  }
+}
